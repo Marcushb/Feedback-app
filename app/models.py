@@ -11,7 +11,7 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(20), unique = True, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
     password = db.Column(db.String(60), nullable = False)
-    posts = db.relationship('Post', backref = 'author', lazy = True)
+    posts = db.relationship('Post', backref = 'user', lazy = True)
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
@@ -20,12 +20,21 @@ class User(db.Model, UserMixin):
 class Post(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     title = db.Column(db.String(100), nullable = False)
-    date_posted = db.Column(db.DateTime, nullable = False, default = datetime.utcnow)
+    date_posted = db.Column(db.DateTime, default = datetime.utcnow())
     content = db.Column(db.Text, nullable = False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = False)
     
     def __repr__(self):
-        return f"User('{self.title}', '{self.date_posted}')"
+        return f"Post('{self.title}', '{self.date_posted}')"
+
+class Answer(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    date_posted = db.Column(db.DateTime, default = datetime.utcnow())
+    content = db.Column(db.Text, nullable = False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = False)
+    post_id = db.Column(db.integer, db.ForeignKey('post.id'), nullable = False)
+    def __repr__(self):
+        return f"Post('{self.title}', '{self.date_posted}')"
 
 def validate_input(input_data):
     username = User.query.filter_by(username = input_data['username']).first()

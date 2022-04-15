@@ -35,6 +35,6 @@ def login():
         login_data = request.form
         user = User.query.filter_by(email = login_data['email']).first()
         if user and bcrypt.check_password_hash(user.password, login_data['password']):
-            return f'Database: {User.query.all()}'
+            return f'Login succesful\nDatabase: {User.query.all()}'
         else:
             return 'Get smashed'

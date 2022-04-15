@@ -7,7 +7,10 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
-run_with_ngrok(app)
+ngrok = False
+
+if ngrok:
+    run_with_ngrok(app)
 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
