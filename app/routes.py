@@ -25,7 +25,9 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-    return f'Database: {User.query.all()}'
+        return jsonify([request_data['username'],
+                        request_data['email'],
+                        request_data['password']])
 
 @app.route("/login", methods = ['GET', 'POST'])
 def login():
