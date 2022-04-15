@@ -12,7 +12,7 @@ ngrok = False
 if ngrok:
     run_with_ngrok(app)
 
-
+app.config['SECRET_KEY'] = '6dce49d3b0ac1575f39720120005b5cc2ee0ed20cdba968cd2bbb345647bc9fa'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 
 db = SQLAlchemy(app)

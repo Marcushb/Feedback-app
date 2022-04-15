@@ -1,6 +1,8 @@
+import email
 from app.models import User, Post, validate_input
 from app import app, db, bcrypt
 from flask import request, jsonify
+from flask_login import login_user, logout_user
 
 @app.route("/", methods = ['POST', 'GET'])
 def home():
@@ -12,6 +14,7 @@ def database():
 
 @app.route("/register", methods = ['POST'])
 def register():
+        
     if request.method == 'POST':
         request_data = request.form
         user_valid = validate_input(request_data)
@@ -35,6 +38,13 @@ def login():
         login_data = request.form
         user = User.query.filter_by(email = login_data['email']).first()
         if user and bcrypt.check_password_hash(user.password, login_data['password']):
-            return f'Login succesful\nDatabase: {User.query.all()}'
+            login_user(user, remember = True)
+            return f'Login succesful\nUser information: {User.query.get(user.id)}'
         else:
             return 'Get smashed'
+
+
+@app.route("logout", methods = ["GET", "POST"])
+def logout():
+    if request.method == 'POST':
+        logout_user()
