@@ -2,9 +2,13 @@ from app.models import User, Post, validate_input
 from app import app, db, bcrypt
 from flask import request, jsonify
 
-@app.route("/home")
+@app.route("/", methods = ['POST', 'GET'])
 def home():
-    return 'Home'
+    return 'Home page'
+
+@app.route("/database", methods = ['POST', 'GET'])
+def database():
+    return f'Database: {User.query.all()}, {User.query.filter_by(email = "bla@live.dk").first().password}'
 
 @app.route("/register", methods = ['POST'])
 def register():
@@ -30,3 +34,5 @@ def login():
         user = User.query.filter_by(email = login_data['email']).first()
         if user and bcrypt.check_password_hash(user.password, login_data['password']):
             return f'Database: {User.query.all()}'
+        else:
+            return 'Get smashed'
