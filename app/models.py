@@ -35,7 +35,7 @@ class User(db.Model, UserMixin):
         self.password = bcrypt.generate_password_hash(unhashed_password)
 
     def __repr__(self):
-        return f"User('{self.username}', '{self.email}', '{self.password}')"
+        return f"User('{self.username}', '{self.public_id}, '{self.password}')"
 
 
 class Post(db.Model):

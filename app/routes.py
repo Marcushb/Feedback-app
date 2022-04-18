@@ -13,7 +13,7 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-
+        # print(request.headers['x-access-token'])
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
 
@@ -21,14 +21,18 @@ def token_required(f):
             return jsonify({'message': 'Token is missing'}), 401
 
         try:
-            data = jwt.decode(token, app.config['SECRET_KEY'])
+            print('This is try')
+            data = jwt.decode(token,
+                              app.config['SECRET_KEY'],
+                              algorithms="HS256")
+            print('After data')
             current_user = User.query.filter_by(
-                public_id = data['public_id']).first()
+                public_id=data['public_id']).first()
         except:
-            return jsonify({'message': 'Token is missing'}), 401
+            return jsonify({'message': 'Token does not match'}), 401
 
         return f(current_user, *args, **kwargs)
-    
+
     return decorated
 
 
@@ -40,8 +44,8 @@ def home():
 @app.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
-    return f'{user.user_posts}'
-#    # return f'{User.query.all()}'
+    # return f'{user.user_posts}'
+    return f'{User.query.all()}'
 
 
 @app.route("/register", methods=['POST'])
@@ -87,7 +91,9 @@ def login():
     if bcrypt.check_password_hash(user.password, auth.password):
         token = jwt.encode({'public_id': user.public_id, 'exp': datetime.datetime.utcnow(
         ) + datetime.timedelta(minutes=30)},
-            app.config['SECRET_KEY'])
+            key=app.config['SECRET_KEY'],
+            algorithm="HS256"
+        )
 
         return jsonify({'token': token})
 
@@ -109,7 +115,8 @@ def logout():
 
 
 @app.route("/ask", methods=['POST', 'GET'])
-def ask_question():
+@token_required
+def ask_question(current_user):
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
@@ -125,10 +132,10 @@ def ask_question():
     return f'{Post.query.filter_by(title = post.title).all()}'
 
     # return jsonify(
-        # [
-        #     request.form['title'],
-        #     request.form['content']
-        # ]
+    # [
+    #     request.form['title'],
+    #     request.form['content']
+    # ]
     # )
 
 
