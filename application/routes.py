@@ -1,5 +1,5 @@
-from app.models import User, Post, validate_input
-from app import app, db, bcrypt
+from application.models import User, Post, validate_input
+from application import application, db, bcrypt
 from flask import request, jsonify, make_response
 from flask_login import login_user, logout_user
 import uuid
@@ -23,7 +23,7 @@ def token_required(f):
         try:
             print('This is try')
             data = jwt.decode(token,
-                              app.config['SECRET_KEY'],
+                              application.config['SECRET_KEY'],
                               algorithms="HS256")
             print('After data')
             current_user = User.query.filter_by(
@@ -36,19 +36,19 @@ def token_required(f):
     return decorated
 
 
-@app.route("/", methods=['POST', 'GET'])
+@application.route("/", methods=['POST', 'GET'])
 def home():
     return 'Home page'
 
 
-@app.route("/database", methods=['POST', 'GET'])
+@application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
     # return f'{user.user_posts}'
     return f'{User.query.all()}'
 
 
-@app.route("/register", methods=['POST'])
+@application.route("/register", methods=['POST'])
 def register():
 
     if request.method == 'POST':
@@ -76,7 +76,7 @@ def register():
         )
 
 
-@app.route("/login", methods=['GET', 'POST'])
+@application.route("/login", methods=['GET', 'POST'])
 def login():
     auth = request.authorization
 
@@ -91,7 +91,7 @@ def login():
     if bcrypt.check_password_hash(user.password, auth.password):
         token = jwt.encode({'public_id': user.public_id, 'exp': datetime.datetime.utcnow(
         ) + datetime.timedelta(minutes=30)},
-            key=app.config['SECRET_KEY'],
+            key=application.config['SECRET_KEY'],
             algorithm="HS256"
         )
 
@@ -108,13 +108,13 @@ def login():
     #         return 'Get smashed'
 
 
-@app.route("/logout", methods=["GET", "POST"])
+@application.route("/logout", methods=["GET", "POST"])
 def logout():
     if request.method == 'POST':
         logout_user()
 
 
-@app.route("/ask", methods=['POST', 'GET'])
+@application.route("/ask", methods=['POST', 'GET'])
 @token_required
 def ask_question(current_user):
     if request.method == 'POST':
@@ -139,7 +139,7 @@ def ask_question(current_user):
     # )
 
 
-@app.route("/get_all_users", methods=['GET'])
+@application.route("/get_all_users", methods=['GET'])
 def get_all_users():
     users = User.query.all()
     output = []
@@ -148,12 +148,12 @@ def get_all_users():
         user_data['public_id'] = user.public_id
         user_data['username'] = user.username
         user_data['email'] = user.email
-        output.append(user_data)
+        output.applicationend(user_data)
 
     return jsonify({'users': output})
 
 
-@app.route("/get_one_user/<public_id>", methods=['GET'])
+@application.route("/get_one_user/<public_id>", methods=['GET'])
 def get_one_users(public_id):
     user = User.query.filter_by(public_id=public_id).first()
 
