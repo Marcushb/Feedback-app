@@ -10,11 +10,11 @@ def load_user(user_id):
 
 
 class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key = True)
     public_id = db.Column(db.String(50), unique = True)
-    username = db.Column(db.String(20), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(60), nullable=False)
+    username = db.Column(db.String(20), unique = True, nullable = False)
+    email = db.Column(db.String(120), unique = True, nullable = False)
+    password = db.Column(db.String(60), nullable = False)
     user_posts = db.relationship(
         'Post',
         foreign_keys='Post.posted_by_id',
@@ -39,20 +39,20 @@ class User(db.Model, UserMixin):
 
 
 class Post(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow())
+    id = db.Column(db.Integer, primary_key = True)
+    title = db.Column(db.String(100), nullable = False)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
     content = db.Column(db.Text)
     posted_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    post_answers = db.relationship('Answer', backref='post_answers', lazy=True)
+    post_answers = db.relationship('Answer', backref = 'post_answers', lazy = True)
 
     def __repr__(self):
-        return f"Post('{self.title}', '{self.content}')"
+        return f"Post('{self.title}, {self.content}, {self.date_posted}')"
 
 
 class Answer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow())
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
     content = db.Column(db.Text, nullable=False)
     answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     posted_by_id = db.Column(db.Integer, db.ForeignKey('post.id'))

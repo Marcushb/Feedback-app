@@ -122,12 +122,14 @@ def ask_question():
         db.session.add(post)
         db.session.commit()
 
-    return jsonify(
-        [
-            request.form['title'],
-            request.form['content']
-        ]
-    )
+    return f'{Post.query.filter_by(title = post.title).all()}'
+
+    # return jsonify(
+        # [
+        #     request.form['title'],
+        #     request.form['content']
+        # ]
+    # )
 
 
 @app.route("/get_all_users", methods=['GET'])
