@@ -1,4 +1,4 @@
-from app.models import User, Post, validate_input
+from app.models import User, Question, validate_input
 from app import app, db, bcrypt
 from flask import request, jsonify, make_response
 from flask_login import login_user, logout_user
@@ -121,7 +121,7 @@ def ask_question(current_user):
         title = request.form['title']
         content = request.form['content']
 
-        post = Post(
+        post = Question(
             title=title,
             content=content
         )
@@ -129,7 +129,7 @@ def ask_question(current_user):
         db.session.add(post)
         db.session.commit()
 
-    return f'{Post.query.filter_by(title = post.title).all()}'
+    return f'{Question.query.filter_by(title = post.title).all()}'
 
     # return jsonify(
     # [

@@ -15,16 +15,18 @@ class User(db.Model, UserMixin):
     username = db.Column(db.String(20), unique = True, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
     password = db.Column(db.String(60), nullable = False)
-    user_posts = db.relationship(
-        'Post',
-        foreign_keys='Post.posted_by_id',
-        backref='user_posts',
-        lazy=True)
+    user_events = db.relationship(
+        'Event',
+        foreign_keys='Event.created_by_id',
+        backref='user_events',
+        lazy=True
+    )
     user_answers = db.relationship(
         'Answer',
-        foreign_keys='Answer.answered_by_id',
-        backref='user_answers',
-        lazy=True)
+        foreign_keys = 'Answer.answered_by_id',
+        backref = 'user_answers',
+        lazy=True
+    )
 
     @property
     def unhashed_password(self):
@@ -38,24 +40,36 @@ class User(db.Model, UserMixin):
         return f"User('{self.username}', '{self.public_id}, '{self.password}')"
 
 
-class Post(db.Model):
+class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     title = db.Column(db.String(100), nullable = False)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
-    content = db.Column(db.Text)
-    posted_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    post_answers = db.relationship('Answer', backref = 'post_answers', lazy = True)
+    description = db.Column(db.Text)
+    isActive = db.Column(db.Integer)
+    event_questions = db.relationship(
+        'Question',
+        foreign_keys = 'Question.parent_event',
+        backref = 'event_questions'
+    )
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self):
         return f"Post('{self.title}, {self.content}, {self.date_posted}')"
 
+class Question(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    question = db.Column(db.Text, nullable = False)
+    asked_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    question_answers = db.relationship('Answer', foreign_keys='Answer.parent_question', backref = 'question_answers', lazy = True)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
+    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))
 
 class Answer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
     content = db.Column(db.Text, nullable=False)
     answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    posted_by_id = db.Column(db.Integer, db.ForeignKey('post.id'))
+    parent_question = db.Column(db.Integer, db.ForeignKey('question.id'))
 
     def __repr__(self):
         return f"Answer('{self.content}')"
