@@ -22,10 +22,10 @@ class User(db.Model, UserMixin):
         backref='user_events',
         lazy=True
     )
-    user_answers = db.relationship(
-        'Answer',
-        foreign_keys = 'Answer.answered_by_id',
-        backref = 'user_answers',
+    user_questions = db.relationship(
+        'Question',
+        foreign_keys = 'Question.asked_by_user',
+        backref = 'user_questions',
         lazy=True
     )
 
@@ -43,6 +43,7 @@ class User(db.Model, UserMixin):
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
+    app_id = db.Column(db.Integer, nullable = False)
     title = db.Column(db.String(100), nullable = False)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
     description = db.Column(db.Text)
@@ -60,9 +61,9 @@ class Event(db.Model):
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     question = db.Column(db.Text, nullable = False)
-    asked_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     question_answers = db.relationship('Answer', foreign_keys='Answer.parent_question', backref = 'question_answers', lazy = True)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
+    asked_by_user = db.Column(db.Integer, db.ForeignKey('user.id'))
     parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))
 
 class Answer(db.Model):

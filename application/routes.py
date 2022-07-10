@@ -7,6 +7,8 @@ import uuid
 import jwt
 import datetime
 from functools import wraps
+import random
+random.seed(42)
 db.create_all()
 
 
@@ -121,14 +123,13 @@ def createEvent(current_user):
     if request.method == 'POST':
         user = User.query.filter_by(public_id = current_user.public_id).first()
         event = Event(
+            app_id = random.randint(0, 9999),
             title = request.form['title'],
             description = request.form['description'],
             created_by_user = user.id
         )
         db.session.add(event)
         db.session.commit()
-
-        # user.user_events = [event]
 
         return jsonify(
             [
@@ -139,18 +140,26 @@ def createEvent(current_user):
             ]
         )
 
-@application.route("/ask", methods=['POST', 'GET'])
+@application.route("/question/<app_id>", methods=['POST', 'GET'])
 @token_required
-def ask_question(current_user):
+def ask_question(current_user, app_id):
 # def ask_question():
     if request.method == 'POST':
-            
-        question_asked = request.form['question']
+        
+        user = User.query.filter_by(public_id = current_user.public_id).first()
+        event = Event.query.filter_by(app_id = app_id).first()
 
         question = Question(
-            question_asked
+            question = request.form['question'],
+            asked_by_user = user.id,
+            parent_event = event.id
         )
-        return question
+
+        db.session.add(question)
+        db.session.commit()
+
+        # return 'Question works'
+        return question.user_questions.email, question.event_questions.title
 
     #     db.session.add(question_asked)
     #     db.session.commit()
