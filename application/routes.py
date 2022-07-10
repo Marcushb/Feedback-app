@@ -1,4 +1,5 @@
-from application.models import User, Question, validate_input
+from pickle import TRUE
+from application.models import User, Event, Question, validate_input
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
 from flask_login import login_user, logout_user
@@ -6,7 +7,7 @@ import uuid
 import jwt
 import datetime
 from functools import wraps
-# db.create_all()
+db.create_all()
 
 
 def token_required(f):
@@ -71,7 +72,8 @@ def register():
             [
                 request.form['username'],
                 request.form['email'],
-                request.form['password']
+                request.form['password'],
+                user.public_id
             ]
         )
 
@@ -113,23 +115,47 @@ def logout():
     if request.method == 'POST':
         logout_user()
 
+@application.route("/create_event", methods = ['POST', 'GET'])
+@token_required
+def createEvent(current_user):
+    if request.method == 'POST':
+        user = User.query.filter_by(public_id = current_user.public_id).first()
+        event = Event(
+            title = request.form['title'],
+            description = request.form['description'],
+            created_by_user = user.id
+        )
+        db.session.add(event)
+        db.session.commit()
+
+        # user.user_events = [event]
+
+        return jsonify(
+            [
+                event.title,
+                event.description,
+                event.user_events.username,
+                event.user_events.email
+            ]
+        )
 
 @application.route("/ask", methods=['POST', 'GET'])
 @token_required
 def ask_question(current_user):
+# def ask_question():
     if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
+            
+        question_asked = request.form['question']
 
-        post = Question(
-            title=title,
-            content=content
+        question = Question(
+            question_asked
         )
+        return question
 
-        db.session.add(post)
-        db.session.commit()
+    #     db.session.add(question_asked)
+    #     db.session.commit()
 
-    return f'{Question.query.filter_by(title = post.title).all()}'
+    # return f'{Question.query.filter_by(question = question.question_asked).all()}'
 
     # return jsonify(
     # [

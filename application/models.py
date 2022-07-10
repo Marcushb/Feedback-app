@@ -10,6 +10,7 @@ def load_user(user_id):
 
 
 class User(db.Model, UserMixin):
+    # __tablename__ = 'User'
     id = db.Column(db.Integer, primary_key = True)
     public_id = db.Column(db.String(50), unique = True)
     username = db.Column(db.String(20), unique = True, nullable = False)
@@ -17,7 +18,7 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(60), nullable = False)
     user_events = db.relationship(
         'Event',
-        foreign_keys='Event.created_by_id',
+        foreign_keys='Event.created_by_user',
         backref='user_events',
         lazy=True
     )
@@ -45,16 +46,16 @@ class Event(db.Model):
     title = db.Column(db.String(100), nullable = False)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
     description = db.Column(db.Text)
-    isActive = db.Column(db.Integer)
+    isActive = db.Column(db.Integer, default = True)
     event_questions = db.relationship(
         'Question',
         foreign_keys = 'Question.parent_event',
         backref = 'event_questions'
     )
-    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_by_user = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self):
-        return f"Post('{self.title}, {self.content}, {self.date_posted}')"
+        return f"Event('{self.title}, {self.description}, {self.date_posted}')"
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key = True)
