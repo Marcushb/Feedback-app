@@ -1,5 +1,5 @@
 from pickle import TRUE
-from application.models import User, Event, Question, validate_input
+from application.models import User, Event, Question, Feedback, validate_input
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
 from flask_login import login_user, logout_user
@@ -8,7 +8,7 @@ import jwt
 import datetime
 from functools import wraps
 import random
-random.seed(42)
+# random.seed(42)
 db.create_all()
 
 
@@ -154,25 +154,26 @@ def ask_question(current_user, app_id):
             asked_by_user = user.id,
             parent_event = event.id
         )
-
         db.session.add(question)
         db.session.commit()
 
-        # return 'Question works'
-        return question.user_questions.email, question.event_questions.title
+        return question.user_questions.email
 
-    #     db.session.add(question_asked)
-    #     db.session.commit()
+@application.route("/feedback/<question_id>", methods = ['POST'])
+def give_feedback(question_id):
+    if request.method == 'POST':
+        parent_question = Question.query.filter_by(id = int(question_id)).first()
+        parent_user = User.query.filter_by(id = parent_question.asked_by_user).first()
 
-    # return f'{Question.query.filter_by(question = question.question_asked).all()}'
+        feedback = Feedback(
+            content = request.form['content'],
+            answered_by_id = parent_user.id,
+            parent_question = parent_question.id
+        )
+        db.session.add(feedback)
+        db.session.commit()
 
-    # return jsonify(
-    # [
-    #     request.form['title'],
-    #     request.form['content']
-    # ]
-    # )
-
+        return parent_question.question
 
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
@@ -201,3 +202,46 @@ def get_one_users(public_id):
     user_data['email'] = user.email
 
     return jsonify({'user': user_data})
+
+@application.route("/get_event", methods = ['POST'])
+def get_event():
+    if request.method == 'POST':
+        user = User.query.filter_by(id = request.form['id']).first()
+        events_db = Event.query.filter_by(created_by_user = user.id).all()
+
+        events = []
+        for event in events_db:
+            event_data = {}
+            event_data['title'] = event.title
+            event_data['date_posted'] = event.date_posted
+            event_data['description'] = event.description
+            event_data['isActive'] = event.isActive
+
+            questions_db = Question.query.filter_by(parent_event = event.id).all()
+            questions = []
+            for question in questions_db:
+                question_data = {}
+                question_data['question'] = question.question
+                question_data['date_posted'] = question.date_posted
+
+                feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
+                feedbacks = []
+                for feedback in feedbacks_db:
+                    feedback_data = {}
+                    feedback_data['content'] = feedback.content
+                    feedback_data['date_posted'] = feedback.date_posted
+                    feedbacks.append(feedback_data)
+
+                question_data['feedbacks'] = feedbacks
+                questions.append(question_data)
+
+            event_data['questions'] = questions
+
+            
+
+            events.append(event_data)
+
+        # questions = Question.query.filter_by(parent_event = events.id)
+
+        # return 'events'
+        return jsonify({'events': events})
