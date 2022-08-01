@@ -12,9 +12,10 @@ def load_user(user_id):
 class User(db.Model, UserMixin):
     # __tablename__ = 'User'
     id = db.Column(db.Integer, primary_key = True)
-    public_id = db.Column(db.String(50), unique = True)
+    # public_id = db.Column(db.String(50), unique = True)
     name = db.Column(db.String(20), unique = False, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
+    jwt_token = db.Column(db.String(200), unique = True, nullable = False)
     user_events = db.relationship(
         'Event',
         foreign_keys='Event.created_by_user',
@@ -76,7 +77,9 @@ class Feedback(db.Model):
         return f"Answer('{self.content}')"
 
 
-def validate_input(input_data):
-    email = User.query.filter_by(email=input_data['email']).first()
-    if email:
-        return jsonify({'message': 'Email already used.'})
+
+class VerifyInput:
+    def validate_input(input_data):
+        email = User.query.filter_by(email=input_data['email']).first()
+        if email:
+            return jsonify({'message': 'Email already used.'})

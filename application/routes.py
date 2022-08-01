@@ -1,4 +1,4 @@
-from application.models import User, Event, Question, Feedback, validate_input
+from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
 import requests
@@ -26,7 +26,8 @@ def token_required(f):
                               application.config['SECRET_KEY'],
                               algorithms="HS256")
             current_user = User.query.filter_by(
-                public_id = data['email']).first()
+                email = data['email']
+                ).first()
         except:
             return jsonify({'message': 'Token does not match'}), 401
 
@@ -37,12 +38,7 @@ def token_required(f):
 
 @application.route("/", methods=['POST', 'GET'])
 def home():
-    token = jwt.encode(
-        {'Issuer': '6effc97b-e2b2-4bf5-82b7-024586f187b7'},
-        key = 'c2b514cd-cde4-4e68-b2c4-81b6ee02144a',
-        algorithm = "HS256"
-        )
-    return token
+    return 'Home'
 
 
 @application.route("/database", methods=['POST', 'GET'])
@@ -51,34 +47,33 @@ def database():
     return f'{User.query.all()}'
 
 
-@application.route("/register", methods=['POST'])
-def register():
+# @application.route("/register", methods=['POST'])
+# def register():
 
-    if request.method == 'POST':
-        user_valid = validate_input(request.form)
-        if user_valid:
-            return user_valid
-        unhashed_password = request.form['password']
+#     if request.method == 'POST':
+#         user_valid = validate_input(request.form)
+#         if user_valid:
+#             return user_valid
+#         unhashed_password = request.form['password']
 
-        user = User(
-            public_id=str(uuid.uuid4()),
-            name=request.form['name'],
-            email=request.form['email'],
-            unhashed_password=unhashed_password
-        )
+#         user = User(
+#             public_id=str(uuid.uuid4()),
+#             name=request.form['name'],
+#             email=request.form['email'],
+#             unhashed_password=unhashed_password
+#         )
 
-        db.session.add(user)
-        db.session.commit()
+#         db.session.add(user)
+#         db.session.commit()
 
-        return jsonify(
-            [
-                request.form['name'],
-                request.form['email'],
-                request.form['password'],
-                user.public_id
-            ]
-        )
-
+#         return jsonify(
+#             [
+#                 request.form['name'],
+#                 request.form['email'],
+#                 request.form['password'],
+#                 user.public_id
+#             ]
+#         )
 
 @application.route("/login", methods=['GET', 'POST'])
 def login():
@@ -90,39 +85,47 @@ def login():
 
         verify_url = "https://graph.microsoft.com/v1.0/me/"
         header = {"Authorization": f"Bearer {access_token}"}
+        verified = requests.get(verify_url, headers = header)
 
-        try:
-            verified = requests.get(verify_url, headers = header).json()
-        except:
-            return jsonify({'message': 'Access token not viable'}), 401
+        if 'error' in verified.json().keys():
+            return verified.json()['error']['code'], verified.status_code
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
                 # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
                 # har virket etc
+        else:
+            verified = verified.json()
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
         user = User.query.filter_by(email = user_email).first()
         if not user:
+            jwt_token = jwt.encode(
+                {
+                    'email': user_email,
+                    'name': user_name
+                },
+                key = application.config['SECRET_KEY'],
+                algorithm = "HS256"
+            )
             new_user = User(
-                public_id = str(uuid.uuid4()),
+                # public_id = str(uuid.uuid4()),
                 name = user_name,
-                email = user_email
+                email = user_email,
+                jwt_token = jwt_token
                 )
             db.session.add(new_user)
             db.session.commit()
             user = User.query.filter_by(email = user_email).first()
 
-        jwt_token = jwt.encode(
-            {
-            'email': user.email,
-            'name': user.name
-            }, 
-            key = application.config['SECRET_KEY'],
-            algorithm = "HS256"
-        )
         # For at definere expiration time
         # 'exp': datetime.datetime.utcnow(
         # ) + datetime.timedelta(minutes=30)}
 
-        return jsonify({'jwt_token': jwt_token}), 200
+        return jsonify(
+            {
+                'jwt_token': user.jwt_token,
+                'email': user.email,
+                'name': user.name
+            }
+        ), 200
 
     return jsonify({'message': 'Request method must be POST'}), 401
 
@@ -144,7 +147,7 @@ def login():
 @token_required
 def createEvent(current_user):
     if request.method == 'POST':
-        user = User.query.filter_by(public_id = current_user.public_id).first()
+        user = User.query.filter_by(email = current_user.email).first()
         event = Event(
             app_id = random.randint(0, 9999),
             title = request.form['title'],
@@ -155,12 +158,13 @@ def createEvent(current_user):
         db.session.commit()
 
         return jsonify(
-            [
-                event.title,
-                event.description,
-                event.user_events.name,
-                event.user_events.email
-            ]
+            {
+                'title': f'{event.title}',
+                'description': f'{event.description}',
+                'creator_name': f'{event.user_events.name}',
+                'creator_email': f'{event.user_events.email}',
+                'event_public_id': f'{event.app_id}'
+            }
         )
 
 @application.route("/question/<app_id>", methods=['POST', 'GET'])
@@ -179,7 +183,7 @@ def ask_question(current_user, app_id):
         db.session.add(question)
         db.session.commit()
 
-        return question.user_questions.email
+        return question.question, 200
 
 @application.route("/feedback/<question_id>", methods = ['POST'])
 def give_feedback(question_id):
@@ -195,7 +199,7 @@ def give_feedback(question_id):
         db.session.add(feedback)
         db.session.commit()
 
-        return parent_question.question
+        return feedback.content
 
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
@@ -263,7 +267,12 @@ def get_event():
 
             events.append(event_data)
 
-        return jsonify({'events': events})
+        return jsonify(
+                {
+                'email': user.email, 
+                'events': events
+                }
+            )
 @application.route("/test", methods = ["POST"])
 def test():
     return "blabla", 401
