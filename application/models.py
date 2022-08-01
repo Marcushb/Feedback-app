@@ -1,7 +1,5 @@
-from sys import settrace
-
 from flask import jsonify
-from application import db, login_manager, bcrypt
+from application import db, login_manager
 from datetime import datetime
 from flask_login import UserMixin
 
@@ -15,9 +13,8 @@ class User(db.Model, UserMixin):
     # __tablename__ = 'User'
     id = db.Column(db.Integer, primary_key = True)
     public_id = db.Column(db.String(50), unique = True)
-    username = db.Column(db.String(20), unique = True, nullable = False)
+    name = db.Column(db.String(20), unique = False, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
-    password = db.Column(db.String(60), nullable = False)
     user_events = db.relationship(
         'Event',
         foreign_keys='Event.created_by_user',
@@ -31,16 +28,16 @@ class User(db.Model, UserMixin):
         lazy=True
     )
 
-    @property
-    def unhashed_password(self):
-        raise AttributeError('Cannot view unhashed password')
+    # @property
+    # def unhashed_password(self):
+    #     raise AttributeError('Cannot view unhashed password')
 
-    @unhashed_password.setter
-    def unhashed_password(self, unhashed_password):
-        self.password = bcrypt.generate_password_hash(unhashed_password)
+    # @unhashed_password.setter
+    # def unhashed_password(self, unhashed_password):
+    #     self.password = bcrypt.generate_password_hash(unhashed_password)
 
     def __repr__(self):
-        return f"User('{self.username}', '{self.public_id}, '{self.password}')"
+        return f"User('{self.name}\n','{self.email}"
 
 
 class Event(db.Model):

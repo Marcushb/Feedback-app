@@ -1,16 +1,12 @@
-from pickle import TRUE
 from application.models import User, Event, Question, Feedback, validate_input
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
-from flask_login import login_user, logout_user
+import requests
 import uuid
 import jwt
 import datetime
 from functools import wraps
 import random
-
-from application.check_jwt import get_public_key
-import os, sys
 # random.seed(42)
 db.create_all()
 
@@ -18,19 +14,19 @@ db.create_all()
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
+        jwt_token = None
         if 'x-access-token' in request.headers:
-            token = request.headers['x-access-token']
+            jwt_token = request.headers['x-access-token']
 
-        if not token:
+        if not jwt_token:
             return jsonify({'message': 'Token is missing'}), 401
 
         try:
-            data = jwt.decode(token,
+            data = jwt.decode(jwt_token,
                               application.config['SECRET_KEY'],
                               algorithms="HS256")
             current_user = User.query.filter_by(
-                public_id=data['public_id']).first()
+                public_id = data['email']).first()
         except:
             return jsonify({'message': 'Token does not match'}), 401
 
@@ -66,7 +62,7 @@ def register():
 
         user = User(
             public_id=str(uuid.uuid4()),
-            username=request.form['username'],
+            name=request.form['name'],
             email=request.form['email'],
             unhashed_password=unhashed_password
         )
@@ -76,7 +72,7 @@ def register():
 
         return jsonify(
             [
-                request.form['username'],
+                request.form['name'],
                 request.form['email'],
                 request.form['password'],
                 user.public_id
@@ -86,26 +82,49 @@ def register():
 
 @application.route("/login", methods=['GET', 'POST'])
 def login():
-    auth = request.authorization
+    if request.method == 'POST':
+        access_token = request.form['access_token']
 
-    if not auth or not auth.username or not auth.password:
-        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required"'})
+        if not access_token:
+            return jsonify({'message': 'Access token not found'}), 401
 
-    user = User.query.filter_by(username=auth.username).first()
+        verify_url = "https://graph.microsoft.com/v1.0/me/"
+        header = {"Authorization": f"Bearer {access_token}"}
 
-    if not user:
-        return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required"'})
+        try:
+            verified = requests.get(verify_url, headers = header).json()
+        except:
+            return jsonify({'message': 'Access token not viable'}), 401
+                # undersøg mulighed for at implementre forskellige messages alt efter error, 
+                # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
+                # har virket etc
+        user_email, user_name = verified['userPrincipalName'], verified['displayName']
+        user = User.query.filter_by(email = user_email).first()
+        if not user:
+            new_user = User(
+                public_id = str(uuid.uuid4()),
+                name = user_name,
+                email = user_email
+                )
+            db.session.add(new_user)
+            db.session.commit()
+            user = User.query.filter_by(email = user_email).first()
 
-    if bcrypt.check_password_hash(user.password, auth.password):
-        token = jwt.encode({'public_id': user.public_id, 'exp': datetime.datetime.utcnow(
-        ) + datetime.timedelta(minutes=30)},
-            key=application.config['SECRET_KEY'],
-            algorithm="HS256"
+        jwt_token = jwt.encode(
+            {
+            'email': user.email,
+            'name': user.name
+            }, 
+            key = application.config['SECRET_KEY'],
+            algorithm = "HS256"
         )
+        # For at definere expiration time
+        # 'exp': datetime.datetime.utcnow(
+        # ) + datetime.timedelta(minutes=30)}
 
-        return jsonify({'token': token})
+        return jsonify({'jwt_token': jwt_token}), 200
 
-    return make_response('Could not verify', 401, {'WWW-Authenticate': 'Basic realm = "Login required"'})
+    return jsonify({'message': 'Request method must be POST'}), 401
 
     # if request.method == 'POST':
     #     user = User.query.filter_by(email=request.form['email']).first()
@@ -116,10 +135,10 @@ def login():
     #         return 'Get smashed'
 
 
-@application.route("/logout", methods=["GET", "POST"])
-def logout():
-    if request.method == 'POST':
-        logout_user()
+# @application.route("/logout", methods=["GET", "POST"])
+# def logout():
+#     if request.method == 'POST':
+#         logout_user()
 
 @application.route("/create_event", methods = ['POST', 'GET'])
 @token_required
@@ -139,7 +158,7 @@ def createEvent(current_user):
             [
                 event.title,
                 event.description,
-                event.user_events.username,
+                event.user_events.name,
                 event.user_events.email
             ]
         )
@@ -185,7 +204,7 @@ def get_all_users():
     for user in users:
         user_data = {}
         user_data['public_id'] = user.public_id
-        user_data['username'] = user.username
+        user_data['name'] = user.name
         user_data['email'] = user.email
         output.append(user_data)
 
@@ -201,7 +220,7 @@ def get_one_users(public_id):
 
     user_data = {}
     user_data['public_id'] = user.public_id
-    user_data['username'] = user.username
+    user_data['name'] = user.name
     user_data['email'] = user.email
 
     return jsonify({'user': user_data})
@@ -245,3 +264,6 @@ def get_event():
             events.append(event_data)
 
         return jsonify({'events': events})
+@application.route("/test", methods = ["POST"])
+def test():
+    return "blabla", 401
