@@ -8,6 +8,9 @@ import jwt
 import datetime
 from functools import wraps
 import random
+
+from application.check_jwt import get_public_key
+import os, sys
 # random.seed(42)
 db.create_all()
 
@@ -16,7 +19,6 @@ def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        # print(request.headers['x-access-token'])
         if 'x-access-token' in request.headers:
             token = request.headers['x-access-token']
 
@@ -24,11 +26,9 @@ def token_required(f):
             return jsonify({'message': 'Token is missing'}), 401
 
         try:
-            print('This is try')
             data = jwt.decode(token,
                               application.config['SECRET_KEY'],
                               algorithms="HS256")
-            print('After data')
             current_user = User.query.filter_by(
                 public_id=data['public_id']).first()
         except:
@@ -41,13 +41,17 @@ def token_required(f):
 
 @application.route("/", methods=['POST', 'GET'])
 def home():
-    return 'Home page'
+    token = jwt.encode(
+        {'Issuer': '6effc97b-e2b2-4bf5-82b7-024586f187b7'},
+        key = 'c2b514cd-cde4-4e68-b2c4-81b6ee02144a',
+        algorithm = "HS256"
+        )
+    return token
 
 
 @application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
-    # return f'{user.user_posts}'
     return f'{User.query.all()}'
 
 
@@ -143,7 +147,6 @@ def createEvent(current_user):
 @application.route("/question/<app_id>", methods=['POST', 'GET'])
 @token_required
 def ask_question(current_user, app_id):
-# def ask_question():
     if request.method == 'POST':
         
         user = User.query.filter_by(public_id = current_user.public_id).first()
@@ -241,7 +244,4 @@ def get_event():
 
             events.append(event_data)
 
-        # questions = Question.query.filter_by(parent_event = events.id)
-
-        # return 'events'
         return jsonify({'events': events})

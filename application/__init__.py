@@ -20,3 +20,11 @@ bcrypt = Bcrypt(application)
 login_manager = LoginManager(application)
 
 from application import routes
+
+from msal import PublicClientApplication
+app_microsoft = PublicClientApplication(
+    "94ced860-137f-439b-b5d1-c1ecd802ddc2",
+    authority = "https://login.microsoftonline.com/f8cdef31-a31e-4b4a-93e4-5f571e91255a"
+    )
+
+

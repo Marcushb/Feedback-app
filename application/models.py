@@ -1,4 +1,6 @@
 from sys import settrace
+
+from flask import jsonify
 from application import db, login_manager, bcrypt
 from datetime import datetime
 from flask_login import UserMixin
@@ -78,9 +80,6 @@ class Feedback(db.Model):
 
 
 def validate_input(input_data):
-    username = User.query.filter_by(username=input_data['username']).first()
     email = User.query.filter_by(email=input_data['email']).first()
-    if username:
-        return('Username already exists.')
-    elif email:
-        return ('Email already used.')
+    if email:
+        return jsonify({'message': 'Email already used.'})
