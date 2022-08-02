@@ -25,9 +25,7 @@ def token_required(f):
             data = jwt.decode(jwt_token,
                               application.config['SECRET_KEY'],
                               algorithms="HS256")
-            current_user = User.query.filter_by(
-                email = data['email']
-                ).first()
+            current_user = User.query.filter_by(email = data['email']).first()
         except:
             return jsonify({'message': 'Token does not match'}), 401
 
