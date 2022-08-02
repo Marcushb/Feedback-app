@@ -44,9 +44,11 @@ class User(db.Model, UserMixin):
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     app_id = db.Column(db.Integer, nullable = False)
-    title = db.Column(db.String(100), nullable = True)
+    title = db.Column(db.String(100), nullable = False)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
-    description = db.Column(db.Text)
+    date_start = db.Column(db.DateTime, nullable = True)
+    date_end = db.Column(db.DateTime, nullable = True)
+    description = db.Column(db.Text, nullable = True)
     isActive = db.Column(db.Integer, default = True)
     event_questions = db.relationship(
         'Question',
@@ -61,7 +63,6 @@ class Event(db.Model):
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     question = db.Column(db.Text, nullable = False)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
     question_answers = db.relationship('Feedback', foreign_keys = 'Feedback.parent_question', backref = 'question_answers', lazy = True)
     asked_by_user = db.Column(db.Integer, db.ForeignKey('user.id'))
     parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))

@@ -1,3 +1,4 @@
+from sqlalchemy import null
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
@@ -73,10 +74,10 @@ def database():
 #             ]
 #         )
 
-@application.route("/login", methods=['GET', 'POST'])
+@application.route("/login_microsoft", methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        access_token = request.form['access_token']
+        access_token = request.headers['Authorization']
 
         if not access_token:
             return jsonify({'message': 'Access token not found'}), 401
@@ -93,6 +94,8 @@ def login():
         else:
             verified = verified.json()
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
+        if user_name == "":
+            user_name = null
         user = User.query.filter_by(email = user_email).first()
         if not user:
             jwt_token = jwt.encode(
@@ -117,6 +120,9 @@ def login():
         # 'exp': datetime.datetime.utcnow(
         # ) + datetime.timedelta(minutes=30)}
 
+        # Create function to convert one type of variable to another
+        if user.name == "":
+            user.name = None
         return jsonify(
             {
                 'jwt_token': user.jwt_token,
@@ -140,6 +146,30 @@ def login():
 # def logout():
 #     if request.method == 'POST':
 #         logout_user()
+
+
+@token_required
+@application.route("/get_outlook_events", methods = ["POST"])
+def get_outlook_events(current_user):
+    if request.method == 'POST':
+        # LAV GENEREL FUNKTION TIL AT VERIFICERE
+        access_token = request.form['accessToken']
+        verify_url = "https://graph.microsoft.com/v1.0/me/events"
+        header = {"Authorization": f"Bearer {access_token}"}
+        verified = requests.get(verify_url, headers = header)
+
+        if 'error' in verified.json().keys():
+            return verified.json()['error']['code'], verified.status_code
+                # undersøg mulighed for at implementre forskellige messages alt efter error, 
+                # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
+                # har virket etc
+        else:
+            verified = verified.json()
+        
+
+
+    return jsonify({'message': 'Request method must be POST'}), 401
+
 
 @application.route("/create_event", methods = ['POST', 'GET'])
 @token_required
@@ -227,7 +257,7 @@ def get_one_users(public_id):
 
     return jsonify({'user': user_data})
 
-@application.route("/get_event", methods = ['POST'])
+@application.route("/get_events", methods = ['POST'])
 def get_event():
     if request.method == 'POST':
         user = User.query.filter_by(id = request.form['id']).first()
@@ -274,3 +304,4 @@ def get_event():
 @application.route("/test", methods = ["POST"])
 def test():
     return "blabla", 401
+
