@@ -148,8 +148,9 @@ def login():
 #         logout_user()
 
 
+
+@application.route("/get_microsoft_events", methods = ["POST"])
 @token_required
-@application.route("/get_outlook_events", methods = ["POST"])
 def get_outlook_events(current_user):
     if request.method == 'POST':
         # LAV GENEREL FUNKTION TIL AT VERIFICERE
@@ -184,6 +185,9 @@ def createEvent(current_user):
         )
         db.session.add(event)
         db.session.commit()
+
+
+
 
         return jsonify(
             {

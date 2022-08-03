@@ -1,0 +1,26 @@
+Implementer Questions i getEvent kaldet korrekt (opret questions sammen med Event)
+
+Lav kald til bruger der sender app ID (event title, event description og questions)
+
+Lav kald der sender microsoft data til Dam
+
+Undersøg om isActive kan sættes efter end time + 1 time default
+
+Questions class tager date_posted fra user (slettet fra Questions class)
+
+Lav generelle funktioner der kan bruges i routes
+
+Template kald med eksempler på spørgsmål
+
+Frequency kolonne i Qeustions (hvor mange gange spørgsmålet er blevet brugt). 
+ Kan bruges til suggestions der kan vises når en bruger skal oprette spørgsmål.
+ sendes til Dam
+
+Skriv dokumentation
+
+Lav datetime datoer til iso med .isoformat()
+
+Lav PUT kald til at ændre data for et event
+
+Lav DELETE kald til at slette event
+
