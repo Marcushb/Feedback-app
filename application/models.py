@@ -45,9 +45,9 @@ class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     app_id = db.Column(db.Integer, nullable = False)
     title = db.Column(db.String(100), nullable = False)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
-    date_start = db.Column(db.DateTime, nullable = True)
-    date_end = db.Column(db.DateTime, nullable = True)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = False)
+    date_start = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = True)
+    date_end = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = True)
     description = db.Column(db.Text, nullable = True)
     isActive = db.Column(db.Integer, default = True)
     event_questions = db.relationship(
@@ -84,3 +84,10 @@ class VerifyInput:
         email = User.query.filter_by(email=input_data['email']).first()
         if email:
             return jsonify({'message': 'Email already used.'})
+
+def clean_data(data):
+ return 'temp'
+
+ def pull_db_data(table, cols):
+    data_db = ''
+    return 'temp'

@@ -1,3 +1,4 @@
+import string
 from sqlalchemy import null
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, bcrypt
@@ -8,6 +9,7 @@ import jwt
 import datetime
 from functools import wraps
 import random
+from datetime import datetime
 # random.seed(42)
 db.create_all()
 
@@ -20,7 +22,9 @@ def token_required(f):
             jwt_token = request.headers['x-access-token']
 
         if not jwt_token:
-            return jsonify({'message': 'Token is missing'}), 401
+            return jsonify({
+                'message': 'Token is missing',
+                'statusCode': 401})
 
         try:
             data = jwt.decode(jwt_token,
@@ -28,7 +32,9 @@ def token_required(f):
                               algorithms="HS256")
             current_user = User.query.filter_by(email = data['email']).first()
         except:
-            return jsonify({'message': 'Token does not match'}), 401
+            return jsonify({
+                'message': 'Token does not match',
+                'statusCode': 401})
 
         return f(current_user, *args, **kwargs)
 
@@ -77,17 +83,23 @@ def database():
 @application.route("/login_microsoft", methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        access_token = request.headers['Authorization']
+        access_token = request.form['accessToken']
 
         if not access_token:
-            return jsonify({'message': 'Access token not found'}), 401
+            return jsonify({
+                'message': 'Access token not found',
+                'statusCode': 401
+                })
 
         verify_url = "https://graph.microsoft.com/v1.0/me/"
         header = {"Authorization": f"Bearer {access_token}"}
         verified = requests.get(verify_url, headers = header)
 
         if 'error' in verified.json().keys():
-            return verified.json()['error']['code'], verified.status_code
+            return jsonify({
+                'message': verified.json()['error']['code'],
+                'statusCode': verified.status_code
+            })
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
                 # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
                 # har virket etc
@@ -123,13 +135,12 @@ def login():
         # Create function to convert one type of variable to another
         if user.name == "":
             user.name = None
-        return jsonify(
-            {
-                'jwt_token': user.jwt_token,
+        return jsonify({
+                'jwtToken': user.jwt_token,
                 'email': user.email,
-                'name': user.name
-            }
-        ), 200
+                'name': user.name,
+                'statusCode': 200    
+        })
 
     return jsonify({'message': 'Request method must be POST'}), 401
 
@@ -157,19 +168,47 @@ def get_outlook_events(current_user):
         access_token = request.form['accessToken']
         verify_url = "https://graph.microsoft.com/v1.0/me/events"
         header = {"Authorization": f"Bearer {access_token}"}
-        verified = requests.get(verify_url, headers = header)
+        params = {
+            'select': 'id, subject, bodyPreview, start, end, attendees, location'
+            }
+        verified = requests.get(url = verify_url, headers = header, params = params)
 
         if 'error' in verified.json().keys():
-            return verified.json()['error']['code'], verified.status_code
+            return jsonify({
+                'message': f"{verified.json()['error']['code']}",
+                'statusCode': f"{verified.status_code}"
+            })
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
                 # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
                 # har virket etc
         else:
             verified = verified.json()
-        
+        output = []
+        for meeting in verified['value']:
+            output_data = {}
+            output_data['microsoft_id'] = meeting['id']
+            output_data['subject'] = meeting['subject']
+            output_data['bodyPreview'] = meeting['bodyPreview']
+            output_data['start_time'] = meeting['start']['dateTime']
+            output_data['end_time'] = meeting['end']['dateTime']
+            output_data['location'] = meeting['location']['displayName']
 
+            attendees_name, attendees_email = [], []
+            for attendee in meeting['attendees']:
+                email, name = attendee['emailAddress']['address'], attendee['emailAddress']['name']
+                attendees_email.append(email), attendees_name.append(name)
+            output_data['attendees_name'] = attendees_name
+            output_data['attendees_email'] = attendees_email
+            output.append(output_data)
 
-    return jsonify({'message': 'Request method must be POST'}), 401
+        return jsonify({
+            'microsoftEvents': output,
+            'statusCode': 200
+        })
+    return jsonify({
+        'message': 'Request method must be POST',
+        'statusCode': 401
+        })
 
 
 @application.route("/create_event", methods = ['POST', 'GET'])
@@ -180,22 +219,46 @@ def createEvent(current_user):
         event = Event(
             app_id = random.randint(0, 9999),
             title = request.form['title'],
+            # date_start = request.form['date_start'],
+            # date_end = datetime request.form['date_end'],
             description = request.form['description'],
+
+
             created_by_user = user.id
         )
         db.session.add(event)
+
+        questions = request.form['question']
+        # FIND LØSNING PÅ LOOP OVER QUESTIONS 
+        if isinstance(question, str):
+            question_db = Question(
+                question = question,
+                asked_by_user = user.id,
+                parent_event = event.id
+            )
+            db.session.add(question_db)
+
+        elif isinstance(question, list):
+            for question in questions:
+                question_db = Question(
+                    question = question,
+                    asked_by_user = user.id,
+                    parent_event = event.id
+                )
+                db.session.add(question_db)
+
         db.session.commit()
 
-
-
-
+        # db.session.add(event, question)
+        # db.session.commit()
         return jsonify(
             {
                 'title': f'{event.title}',
                 'description': f'{event.description}',
-                'creator_name': f'{event.user_events.name}',
-                'creator_email': f'{event.user_events.email}',
-                'event_public_id': f'{event.app_id}'
+                'creatorName': f'{event.user_events.name}',
+                'creatorEmail': f'{event.user_events.email}',
+                'eventPublic_id': f'{event.app_id}',
+                'statusCode': 200
             }
         )
 
@@ -246,9 +309,8 @@ def get_all_users():
 
     return jsonify({'users': output})
 
-
 @application.route("/get_one_user/<public_id>", methods=['GET'])
-def get_one_users(public_id):
+def get_one_user(public_id):
     user = User.query.filter_by(public_id=public_id).first()
 
     if not user:
@@ -262,7 +324,7 @@ def get_one_users(public_id):
     return jsonify({'user': user_data})
 
 @application.route("/get_events", methods = ['POST'])
-def get_event():
+def get_events():
     if request.method == 'POST':
         user = User.query.filter_by(id = request.form['id']).first()
         events_db = Event.query.filter_by(created_by_user = user.id).all()
@@ -305,6 +367,25 @@ def get_event():
                 'events': events
                 }
             )
+
+@application.route("/get_event/<app_id>")
+def get_event(app_id):
+    event = Event.query.filter_by(app_id = app_id).all()
+    questions_db = Question.query.filter_by(parent_event = event.id).all()
+    questions = []
+    for question in questions_db:
+        question_data = {}
+        question_data['question'] = question.question
+    
+    event_object = {
+        'event_title': event.title,
+        'event_descrption': event.description,
+        'questions': questions
+    }
+
+    return event_object
+
+
 @application.route("/test", methods = ["POST"])
 def test():
     return "blabla", 401

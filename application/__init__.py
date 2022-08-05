@@ -3,12 +3,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager
 from flask_ngrok import run_with_ngrok
+from application.config import secret_key, sqlalchemy_database_uri
 
 # from flask_cors import CORS
 
 application = Flask(__name__)
-application.config['SECRET_KEY'] = '6dce49d3b0ac1575f39720120005b5cc2ee0ed20cdba968cd2bbb345647bc9fa'
-application.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+application.config['SECRET_KEY'] = secret_key
+application.config['SQLALCHEMY_DATABASE_URI'] = sqlalchemy_database_uri
 
 db = SQLAlchemy(application)
 bcrypt = Bcrypt(application)
@@ -16,6 +17,6 @@ login_manager = LoginManager(application)
 from application import routes
 
 
-ngrok = True
+ngrok = False
 if ngrok:
     run_with_ngrok(application)

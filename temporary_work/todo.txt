@@ -1,12 +1,14 @@
-Implementer Questions i getEvent kaldet korrekt (opret questions sammen med Event)
+## Implementer Questions i getEvent kaldet korrekt (opret questions sammen med Event)
 
-Lav kald til bruger der sender app ID (event title, event description og questions)
+## Lav kald til bruger der sender app ID (event title, event description og questions)
 
-Lav kald der sender microsoft data til Dam
+## Lav kald der sender microsoft data til Dam
 
 Undersøg om isActive kan sættes efter end time + 1 time default
 
-Questions class tager date_posted fra user (slettet fra Questions class)
+## Questions class tager date_posted fra user (slettet fra Questions class)
+
+Lav specifikke error messages og implementer status_code i return json objektet
 
 Lav generelle funktioner der kan bruges i routes
 
@@ -24,3 +26,4 @@ Lav PUT kald til at ændre data for et event
 
 Lav DELETE kald til at slette event
 
+Lav config file der indeholder secret key og slet fra github
