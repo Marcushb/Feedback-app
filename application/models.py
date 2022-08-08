@@ -1,4 +1,6 @@
-from flask import jsonify
+from unicodedata import numeric
+from flask import jsonify, request
+from sqlalchemy import null
 from application import db, login_manager
 from datetime import datetime
 from flask_login import UserMixin
@@ -45,9 +47,9 @@ class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     app_id = db.Column(db.Integer, nullable = False)
     title = db.Column(db.String(100), nullable = False)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = False)
-    date_start = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = True)
-    date_end = db.Column(db.DateTime, default=datetime.utcnow.isoformat, nullable = True)
+    date_posted = db.Column(db.DateTime, default=datetime.isoformat, nullable = False)
+    date_start = db.Column(db.DateTime, default=datetime.isoformat, nullable = True)
+    date_end = db.Column(db.DateTime, default=datetime.isoformat, nullable = True)
     description = db.Column(db.Text, nullable = True)
     isActive = db.Column(db.Integer, default = True)
     event_questions = db.relationship(
@@ -80,14 +82,28 @@ class Feedback(db.Model):
 
 
 class VerifyInput:
-    def validate_input(input_data):
-        email = User.query.filter_by(email=input_data['email']).first()
-        if email:
-            return jsonify({'message': 'Email already used.'})
+    def check_data(keys_expected, check_type, data = None):
+        match check_type:
+            case "request":
+                data = request.form
+            case "object":
+                data = 'data'
+        key_object = {'result': 'success'}
+        for key in keys_expected:
+            try:
+                key_in_data = data[f'{key}']
+                key_object[f'{key}'] = key_in_data
+            except:
+                return {
+                    'message': f'Expected key not found in body: {key}',
+                    'statusCode': 403,
+                    'result': 'error'
+                }
+        return key_object
+    
+# def clean_data(data):
+#  return 'temp'
 
-def clean_data(data):
- return 'temp'
-
- def pull_db_data(table, cols):
-    data_db = ''
-    return 'temp'
+#  def pull_db_data(table, cols):
+#     data_db = ''
+#     return 'temp'

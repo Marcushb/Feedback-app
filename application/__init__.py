@@ -15,6 +15,8 @@ db = SQLAlchemy(application)
 bcrypt = Bcrypt(application)
 login_manager = LoginManager(application)
 from application import routes
+from application import error_handlers
+
 
 
 ngrok = False

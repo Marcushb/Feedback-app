@@ -1,5 +1,4 @@
-import string
-from sqlalchemy import null
+import json
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, bcrypt
 from flask import request, jsonify, make_response
@@ -40,11 +39,15 @@ def token_required(f):
 
     return decorated
 
-
-@application.route("/", methods=['POST', 'GET'])
+@application.route("/", methods=['POST'])
 def home():
-    return 'Home'
-
+    if request.method == 'POST':
+        input_check = VerifyInput.check_data(keys_expected = ['title'], check_type = 'request')
+        if input_check['result'] == 'error':
+            return jsonify(input_check)
+        else:
+            return input_check
+        # return VerifyInput.validate_input(method = 'POST', data_expected = ['title', "question"])
 
 @application.route("/database", methods=['POST', 'GET'])
 def database():
@@ -80,17 +83,17 @@ def database():
 #             ]
 #         )
 
-@application.route("/login_microsoft", methods=['GET', 'POST'])
+@application.route("/login_microsoft", methods=['POST'])
 def login():
     if request.method == 'POST':
+        input_check = VerifyInput.check_data(
+            keys_expected = ['accessToken'], 
+            check_type = 'request'
+            )
+        if input_check:
+            return input_check
+
         access_token = request.form['accessToken']
-
-        if not access_token:
-            return jsonify({
-                'message': 'Access token not found',
-                'statusCode': 401
-                })
-
         verify_url = "https://graph.microsoft.com/v1.0/me/"
         header = {"Authorization": f"Bearer {access_token}"}
         verified = requests.get(verify_url, headers = header)
@@ -105,9 +108,8 @@ def login():
                 # har virket etc
         else:
             verified = verified.json()
+        VerifyInput.check_request_keys(keys_expected = ['userPrincipalName', 'displayName'])
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
-        if user_name == "":
-            user_name = null
         user = User.query.filter_by(email = user_email).first()
         if not user:
             jwt_token = jwt.encode(
@@ -119,7 +121,6 @@ def login():
                 algorithm = "HS256"
             )
             new_user = User(
-                # public_id = str(uuid.uuid4()),
                 name = user_name,
                 email = user_email,
                 jwt_token = jwt_token
@@ -142,8 +143,6 @@ def login():
                 'statusCode': 200    
         })
 
-    return jsonify({'message': 'Request method must be POST'}), 401
-
     # if request.method == 'POST':
     #     user = User.query.filter_by(email=request.form['email']).first()
     #     if user and bcrypt.check_password_hash(user.password, request.form['password']):
@@ -165,6 +164,8 @@ def login():
 def get_outlook_events(current_user):
     if request.method == 'POST':
         # LAV GENEREL FUNKTION TIL AT VERIFICERE
+        if VerifyInput.check_request_keys(keys_expected = ['accessToken']):
+            return VerifyInput.check_request_keys(keys_expected = ['accessToken'])
         access_token = request.form['accessToken']
         verify_url = "https://graph.microsoft.com/v1.0/me/events"
         header = {"Authorization": f"Bearer {access_token}"}
@@ -183,6 +184,18 @@ def get_outlook_events(current_user):
                 # har virket etc
         else:
             verified = verified.json()
+            VerifyInput.check_object_keys(
+                keys_expected = [
+                    'microsoft_id',
+                    'subject',
+                    'bodyPreview',
+                    'start_time',
+                    'end_time',
+                    'location'
+                ],
+                # Ikke glad for at value[0] er hardcoded - led efter alternativ løsning
+                data = verified['value'][0]
+            )
         output = []
         for meeting in verified['value']:
             output_data = {}
@@ -251,16 +264,14 @@ def createEvent(current_user):
 
         # db.session.add(event, question)
         # db.session.commit()
-        return jsonify(
-            {
+        return jsonify({
                 'title': f'{event.title}',
                 'description': f'{event.description}',
                 'creatorName': f'{event.user_events.name}',
                 'creatorEmail': f'{event.user_events.email}',
                 'eventPublic_id': f'{event.app_id}',
                 'statusCode': 200
-            }
-        )
+                })
 
 @application.route("/question/<app_id>", methods=['POST', 'GET'])
 @token_required
@@ -357,33 +368,26 @@ def get_events():
 
             event_data['questions'] = questions
 
-            
-
             events.append(event_data)
 
-        return jsonify(
-                {
-                'email': user.email, 
-                'events': events
-                }
-            )
+        return jsonify({'email': user.email, 'events': events})
 
-@application.route("/get_event/<app_id>")
+@application.route("/get_event/<app_id>", methods = ['GET'])
 def get_event(app_id):
-    event = Event.query.filter_by(app_id = app_id).all()
-    questions_db = Question.query.filter_by(parent_event = event.id).all()
-    questions = []
-    for question in questions_db:
-        question_data = {}
-        question_data['question'] = question.question
-    
-    event_object = {
-        'event_title': event.title,
-        'event_descrption': event.description,
-        'questions': questions
-    }
-
-    return event_object
+    if request.method == 'GET':
+        event = Event.query.filter_by(app_id = app_id).all()
+        questions_db = Question.query.filter_by(parent_event = event.id).all()
+        questions = []
+        for question in questions_db:
+            question_data = {}
+            question_data['question'] = question.question
+        
+        event_object = {
+            'event_title': event.title,
+            'event_descrption': event.description,
+            'questions': questions
+        }
+        return event_object
 
 
 @application.route("/test", methods = ["POST"])

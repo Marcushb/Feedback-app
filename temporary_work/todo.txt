@@ -8,7 +8,7 @@ Undersøg om isActive kan sættes efter end time + 1 time default
 
 ## Questions class tager date_posted fra user (slettet fra Questions class)
 
-Lav specifikke error messages og implementer status_code i return json objektet
+## Lav specifikke error messages og implementer status_code i return json objektet
 
 Lav generelle funktioner der kan bruges i routes
 
@@ -20,10 +20,10 @@ Frequency kolonne i Qeustions (hvor mange gange spørgsmålet er blevet brugt).
 
 Skriv dokumentation
 
-Lav datetime datoer til iso med .isoformat()
+## Lav datetime datoer til iso med .isoformat()
 
 Lav PUT kald til at ændre data for et event
 
 Lav DELETE kald til at slette event
 
-Lav config file der indeholder secret key og slet fra github
+## Lav config file der indeholder secret key og slet fra github
