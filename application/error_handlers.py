@@ -10,7 +10,7 @@ def not_found(e):
     })
 
 @application.errorhandler(405)
-def not_found(e):
+def method_not_allowed(e):
     return jsonify({
         'errorMessage': f'{e}',
         'statusCode': 405

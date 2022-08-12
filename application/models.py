@@ -82,12 +82,12 @@ class Feedback(db.Model):
 
 
 class VerifyInput:
-    def check_data(keys_expected, check_type, data = None):
+    def check_keys(check_type, keys_expected, data = None):
         match check_type:
             case "request":
                 data = request.form
-            case "object":
-                data = 'data'
+            # case "object":
+            #     data = data
         key_object = {'result': 'success'}
         for key in keys_expected:
             try:
@@ -100,6 +100,14 @@ class VerifyInput:
                     'result': 'error'
                 }
         return key_object
+    
+    def check_overwrite_keys(keys_overwrite, keys_accepted):
+        accepted = all(element in keys_accepted for element in keys_overwrite)
+        if not accepted:
+            return {
+                'message': f'Keys not applicable to be overwritten: {keys_overwrite[accepted]}',
+                'statusCode': 406
+                }
     
 # def clean_data(data):
 #  return 'temp'

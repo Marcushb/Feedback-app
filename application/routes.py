@@ -1,6 +1,6 @@
 import json
 from application.models import User, Event, Question, Feedback, VerifyInput
-from application import application, db, bcrypt
+from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response
 import requests
 import uuid
@@ -42,7 +42,7 @@ def token_required(f):
 @application.route("/", methods=['POST'])
 def home():
     if request.method == 'POST':
-        input_check = VerifyInput.check_data(keys_expected = ['title'], check_type = 'request')
+        input_check = VerifyInput.check_keys(keys_expected = ['title'], check_type = 'request')
         if input_check['result'] == 'error':
             return jsonify(input_check)
         else:
@@ -86,17 +86,17 @@ def database():
 @application.route("/login_microsoft", methods=['POST'])
 def login():
     if request.method == 'POST':
-        input_check = VerifyInput.check_data(
+        input_check = VerifyInput.check_keys(
             keys_expected = ['accessToken'], 
             check_type = 'request'
             )
-        if input_check:
-            return input_check
-
-        access_token = request.form['accessToken']
-        verify_url = "https://graph.microsoft.com/v1.0/me/"
-        header = {"Authorization": f"Bearer {access_token}"}
-        verified = requests.get(verify_url, headers = header)
+        if input_check['result'] == 'error':
+            return jsonify(input_check)
+        header = {"Authorization": f"Bearer {input_check['accessToken']}"}
+        verified = requests.get(
+            url = constant.urls['microsoft']['verify_identity'], 
+            headers = header
+            )
 
         if 'error' in verified.json().keys():
             return jsonify({
@@ -108,8 +108,14 @@ def login():
                 # har virket etc
         else:
             verified = verified.json()
-        VerifyInput.check_request_keys(keys_expected = ['userPrincipalName', 'displayName'])
-        user_email, user_name = verified['userPrincipalName'], verified['displayName']
+        data = VerifyInput.check_keys(
+            check_type = 'object', 
+            keys_expected = ['userPrincipalName', 'displayName'],
+            data = verified
+            )
+        if data['result'] == 'error':
+            return jsonify(data)
+        user_email, user_name = data['userPrincipalName'], data['displayName']
         user = User.query.filter_by(email = user_email).first()
         if not user:
             jwt_token = jwt.encode(
@@ -164,27 +170,28 @@ def login():
 def get_outlook_events(current_user):
     if request.method == 'POST':
         # LAV GENEREL FUNKTION TIL AT VERIFICERE
-        if VerifyInput.check_request_keys(keys_expected = ['accessToken']):
-            return VerifyInput.check_request_keys(keys_expected = ['accessToken'])
-        access_token = request.form['accessToken']
-        verify_url = "https://graph.microsoft.com/v1.0/me/events"
-        header = {"Authorization": f"Bearer {access_token}"}
+        data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
+        if data['result'] == 'error':
+            return jsonify(data)
+        header = {"Authorization": f"Bearer {data['access_token']}"}
         params = {
             'select': 'id, subject, bodyPreview, start, end, attendees, location'
             }
-        verified = requests.get(url = verify_url, headers = header, params = params)
+        verified = requests.get(
+            url = constant.urls['microsoft']['get_user_events'], 
+            headers = header, 
+            params = params
+            )
 
         if 'error' in verified.json().keys():
             return jsonify({
                 'message': f"{verified.json()['error']['code']}",
                 'statusCode': f"{verified.status_code}"
             })
-                # undersøg mulighed for at implementre forskellige messages alt efter error, 
-                # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
-                # har virket etc
         else:
             verified = verified.json()
-            VerifyInput.check_object_keys(
+            data = VerifyInput.check_keys(
+                check_type = 'object',
                 keys_expected = [
                     'microsoft_id',
                     'subject',
@@ -193,9 +200,11 @@ def get_outlook_events(current_user):
                     'end_time',
                     'location'
                 ],
-                # Ikke glad for at value[0] er hardcoded - led efter alternativ løsning
                 data = verified['value'][0]
+                # Ikke glad for at value[0] er hardcoded - led efter alternativ løsning
             )
+            if data['result'] == 'error':
+                return jsonify(data)
         output = []
         for meeting in verified['value']:
             output_data = {}
@@ -224,19 +233,23 @@ def get_outlook_events(current_user):
         })
 
 
-@application.route("/create_event", methods = ['POST', 'GET'])
+@application.route("/create_event", methods = ['POST', 'PUT'])
 @token_required
 def createEvent(current_user):
     if request.method == 'POST':
         user = User.query.filter_by(email = current_user.email).first()
+        data = VerifyInput.check_keys(
+            check_type = 'request', 
+            keys_expected = ['title', 'date_start', 'date_end', 'description']
+            )
+        if data['result'] == 'error':
+            return jsonify(data)
         event = Event(
             app_id = random.randint(0, 9999),
-            title = request.form['title'],
+            title = data['title'],
             # date_start = request.form['date_start'],
             # date_end = datetime request.form['date_end'],
-            description = request.form['description'],
-
-
+            description = data['description'],
             created_by_user = user.id
         )
         db.session.add(event)
@@ -262,8 +275,6 @@ def createEvent(current_user):
 
         db.session.commit()
 
-        # db.session.add(event, question)
-        # db.session.commit()
         return jsonify({
                 'title': f'{event.title}',
                 'description': f'{event.description}',
@@ -272,6 +283,27 @@ def createEvent(current_user):
                 'eventPublic_id': f'{event.app_id}',
                 'statusCode': 200
                 })
+
+    if request.method == 'PUT':
+        data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['appId'])
+        if data['result'] == 'error':
+            return data
+        event = Event.query.filter_by(app_id = data['appId']).first()
+        """
+        Lav funktion der verificerer at de sendte parametre er parametre der kan ændres.
+        F.eks for Event skal den tjekke, at keys i de sendte parametre i request.form[]
+        er i listen ['title', 'date_start', 'date_end', 'description'] 
+        """
+        keys_accepted = VerifyInput.check_overwrite_keys(
+            keys_overwrite = [request.form['keys_overwrite']], 
+            keys_accepted = constant.db_overwrite_params['Event']
+            )
+        if keys_accepted:
+            return jsonify(keys_accepted)
+        else:
+            return 'keys overwrite accepted'
+
+
 
 @application.route("/question/<app_id>", methods=['POST', 'GET'])
 @token_required
