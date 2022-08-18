@@ -85,13 +85,13 @@ class VerifyInput:
     def check_keys(check_type, keys_expected, data = None):
         match check_type:
             case "request":
-                data = request.form
+                data = request.get_json
             # case "object":
             #     data = data
         key_object = {'result': 'success'}
         for key in keys_expected:
             try:
-                key_in_data = data[f'{key}']
+                key_in_data = data(f'{key}')
                 key_object[f'{key}'] = key_in_data
             except:
                 return {

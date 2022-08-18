@@ -9,6 +9,7 @@ import datetime
 from functools import wraps
 import random
 from datetime import datetime
+import dateutil.parser
 # random.seed(42)
 db.create_all()
 
@@ -23,7 +24,8 @@ def token_required(f):
         if not jwt_token:
             return jsonify({
                 'message': 'Token is missing',
-                'statusCode': 401})
+                'statusCode': 401
+                }), 401
 
         try:
             data = jwt.decode(jwt_token,
@@ -42,11 +44,13 @@ def token_required(f):
 @application.route("/", methods=['POST'])
 def home():
     if request.method == 'POST':
-        input_check = VerifyInput.check_keys(keys_expected = ['title'], check_type = 'request')
-        if input_check['result'] == 'error':
-            return jsonify(input_check)
-        else:
-            return input_check
+        input_check = request.get_json('title')
+        # input_check = VerifyInput.check_keys(keys_expected = ['title'], check_type = 'request')
+        return input_check
+        # if input_check['result'] == 'error':
+        #     return jsonify(input_check)
+        # else:
+        #     return input_check
         # return VerifyInput.validate_input(method = 'POST', data_expected = ['title', "question"])
 
 @application.route("/database", methods=['POST', 'GET'])
@@ -86,12 +90,13 @@ def database():
 @application.route("/login_microsoft", methods=['POST'])
 def login():
     if request.method == 'POST':
-        input_check = VerifyInput.check_keys(
-            keys_expected = ['accessToken'], 
-            check_type = 'request'
-            )
-        if input_check['result'] == 'error':
-            return jsonify(input_check)
+        # input_check = VerifyInput.check_keys(
+        #     keys_expected = ['accessToken'], 
+        #     check_type = 'request'
+        #     )
+        # if input_check['result'] == 'error':
+        #     return jsonify(input_check)
+        input_check = request.get_json('accessToken')
         header = {"Authorization": f"Bearer {input_check['accessToken']}"}
         verified = requests.get(
             url = constant.urls['microsoft']['verify_identity'], 
@@ -108,6 +113,7 @@ def login():
                 # har virket etc
         else:
             verified = verified.json()
+        """"
         data = VerifyInput.check_keys(
             check_type = 'object', 
             keys_expected = ['userPrincipalName', 'displayName'],
@@ -115,7 +121,9 @@ def login():
             )
         if data['result'] == 'error':
             return jsonify(data)
-        user_email, user_name = data['userPrincipalName'], data['displayName']
+        """
+        # data = request.get_json('userPrincipalName, displayName')
+        user_email, user_name = verified['userPrincipalName'], verified['displayName']
         user = User.query.filter_by(email = user_email).first()
         if not user:
             jwt_token = jwt.encode(
@@ -145,8 +153,7 @@ def login():
         return jsonify({
                 'jwtToken': user.jwt_token,
                 'email': user.email,
-                'name': user.name,
-                'statusCode': 200    
+                'name': user.name
         })
 
     # if request.method == 'POST':
@@ -170,10 +177,11 @@ def login():
 def get_outlook_events(current_user):
     if request.method == 'POST':
         # LAV GENEREL FUNKTION TIL AT VERIFICERE
-        data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
-        if data['result'] == 'error':
-            return jsonify(data)
-        header = {"Authorization": f"Bearer {data['access_token']}"}
+        # data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
+        # if data['result'] == 'error':
+        #     return jsonify(data)
+        data = request.get_json('accessToken')
+        header = {"Authorization": f"Bearer {data['accessToken']}"}
         params = {
             'select': 'id, subject, bodyPreview, start, end, attendees, location'
             }
@@ -190,47 +198,47 @@ def get_outlook_events(current_user):
             })
         else:
             verified = verified.json()
-            data = VerifyInput.check_keys(
+            """data = VerifyInput.check_keys(
                 check_type = 'object',
                 keys_expected = [
-                    'microsoft_id',
+                    'id',
                     'subject',
                     'bodyPreview',
-                    'start_time',
-                    'end_time',
-                    'location'
+                    'start',
+                    'end',
+                    'location',
+                    'attendees'
                 ],
                 data = verified['value'][0]
                 # Ikke glad for at value[0] er hardcoded - led efter alternativ løsning
             )
             if data['result'] == 'error':
-                return jsonify(data)
+                return jsonify(data)"""
         output = []
         for meeting in verified['value']:
             output_data = {}
-            output_data['microsoft_id'] = meeting['id']
+            output_data['id'] = meeting['id']
             output_data['subject'] = meeting['subject']
             output_data['bodyPreview'] = meeting['bodyPreview']
-            output_data['start_time'] = meeting['start']['dateTime']
-            output_data['end_time'] = meeting['end']['dateTime']
+            output_data['startTime'] = dateutil.parser.isoparse(meeting['start']['dateTime']).isoformat() + "Z"
+            output_data['endTime'] = dateutil.parser.isoparse(meeting['end']['dateTime']).isoformat() + "Z"
             output_data['location'] = meeting['location']['displayName']
 
-            attendees_name, attendees_email = [], []
+            attendees = []
             for attendee in meeting['attendees']:
-                email, name = attendee['emailAddress']['address'], attendee['emailAddress']['name']
-                attendees_email.append(email), attendees_name.append(name)
-            output_data['attendees_name'] = attendees_name
-            output_data['attendees_email'] = attendees_email
+                data = {
+                    'email': attendee['emailAddress']['address'], 
+                    'name': attendee['emailAddress']['name']
+                    }
+                attendees.append(data)
+            output_data['attendees'] = attendees
             output.append(output_data)
 
-        return jsonify({
-            'microsoftEvents': output,
-            'statusCode': 200
-        })
+        return jsonify({'response': output}), 200
     return jsonify({
         'message': 'Request method must be POST',
         'statusCode': 401
-        })
+        }), 401
 
 
 @application.route("/create_event", methods = ['POST', 'PUT'])
@@ -254,7 +262,7 @@ def createEvent(current_user):
         )
         db.session.add(event)
 
-        questions = request.form['question']
+        questions = request.get_json('question')
         # FIND LØSNING PÅ LOOP OVER QUESTIONS 
         if isinstance(question, str):
             question_db = Question(
@@ -295,7 +303,7 @@ def createEvent(current_user):
         er i listen ['title', 'date_start', 'date_end', 'description'] 
         """
         keys_accepted = VerifyInput.check_overwrite_keys(
-            keys_overwrite = [request.form['keys_overwrite']], 
+            keys_overwrite = [request.get_json('keys_overwrite')], 
             keys_accepted = constant.db_overwrite_params['Event']
             )
         if keys_accepted:
@@ -314,7 +322,7 @@ def ask_question(current_user, app_id):
         event = Event.query.filter_by(app_id = app_id).first()
 
         question = Question(
-            question = request.form['question'],
+            question = request.get_json('question'),
             asked_by_user = user.id,
             parent_event = event.id
         )
@@ -330,7 +338,7 @@ def give_feedback(question_id):
         parent_user = User.query.filter_by(id = parent_question.asked_by_user).first()
 
         feedback = Feedback(
-            content = request.form['content'],
+            content = request.get_json('content'),
             answered_by_id = parent_user.id,
             parent_question = parent_question.id
         )
@@ -369,7 +377,7 @@ def get_one_user(public_id):
 @application.route("/get_events", methods = ['POST'])
 def get_events():
     if request.method == 'POST':
-        user = User.query.filter_by(id = request.form['id']).first()
+        user = User.query.filter_by(id = request.get_json('id')).first()
         events_db = Event.query.filter_by(created_by_user = user.id).all()
 
         events = []
