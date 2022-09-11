@@ -1,16 +1,15 @@
 import json
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, constant, bcrypt
-from flask import request, jsonify, make_response
+from flask import request, jsonify, make_response, json
 from application.functions import change_event
 import requests
 import uuid
 import jwt
-import datetime
 from functools import wraps
 import random
 from datetime import datetime
-import dateutil.parser
+from dateutil import parser
 # random.seed(42)
 db.create_all()
 
@@ -50,8 +49,9 @@ def home():
         # user.name = "changed_name"
         
         # db.session.commit()
+        data = request.get_json(force = True)
+        return 'Yes'
 
-        return 'Hello'
 @application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
@@ -95,7 +95,7 @@ def login():
         #     )
         # if input_check['result'] == 'error':
         #     return jsonify(input_check)
-        input_check = request.get_json('accessToken')
+        input_check = request.get_json(force = True)
         header = {"Authorization": f"Bearer {input_check['accessToken']}"}
         verified = requests.get(
             url = constant.urls['microsoft']['verify_identity'], 
@@ -223,8 +223,8 @@ def get_outlook_events(current_user):
             output_data['id'] = meeting['id']
             output_data['subject'] = meeting['subject']
             output_data['bodyPreview'] = meeting['bodyPreview']
-            output_data['startTime'] = dateutil.parser.isoparse(meeting['start']['dateTime']).isoformat() + "Z"
-            output_data['endTime'] = dateutil.parser.isoparse(meeting['end']['dateTime']).isoformat() + "Z"
+            output_data['startTime'] = parser.isoparse(meeting['start']['dateTime']).isoformat() + "Z"
+            output_data['endTime'] = parser.isoparse(meeting['end']['dateTime']).isoformat() + "Z"
             output_data['location'] = meeting['location']['displayName']
 
             attendees = []
@@ -249,42 +249,30 @@ def get_outlook_events(current_user):
 def createEvent(current_user):
     if request.method == 'POST':
         user = User.query.filter_by(email = current_user.email).first()
-        data = VerifyInput.check_keys(
-            check_type = 'request', 
-            keys_expected = ['title', 'date_start', 'date_end', 'description']
-            )
-        if data['result'] == 'error':
-            return jsonify(data)
+        data = request.get_json(force = True)
+
+        public_id = str(uuid.uuid4())
         event = Event(
-            event_pin = random.randint(0, 9999),
+            public_id = public_id,
+            pin = random.randint(0, 9999),
             title = data['title'],
-            # date_start = request.form['date_start'],
-            # date_end = datetime request.form['date_end'],
+            date_start = data['startDate'],
+            date_end = data['endDate'],
             description = data['description'],
             created_by_user = user.id
         )
         db.session.add(event)
 
-        questions = request.get_json('question')
-        # FIND LØSNING PÅ LOOP OVER QUESTIONS 
-        # if isinstance(questions, str):
-        #     question_db = Question(
-        #         question = question,
-        #         asked_by_user = user.id,
-        #         parent_event = event.id
-        #     )
-        #     db.session.add(question_db)
+        questions = data['questions']
+        event = Event.query.filter_by(public_id = public_id).first()
 
-        # elif isinstance(questions, list):
-        # FORVENT ALTID LISTE, TJEK DET ER SANDT
-        if isinstance(question, list):
-            for question in questions:
-                question_db = Question(
-                    question = question,
-                    asked_by_user = user.id,
-                    parent_event = event.id
-                )
-                db.session.add(question_db)
+        for question in questions:
+            question_db = Question(
+                description = question,
+                asked_by_user = user.id,
+                parent_event = event.id
+            )
+            db.session.add(question_db)
 
         db.session.commit()
 
@@ -293,8 +281,7 @@ def createEvent(current_user):
                 'description': f'{event.description}',
                 'creatorName': f'{event.user_events.name}',
                 'creatorEmail': f'{event.user_events.email}',
-                'eventPublic_id': f'{event.app_id}',
-                'statusCode': 200
+                'eventPublic_id': f'{event.pin}',
                 }), 200
 
     if request.method == 'PUT':
@@ -409,6 +396,34 @@ def get_one_user(public_id):
     user_data['email'] = user.email
 
     return jsonify({'user': user_data})
+
+
+@application.route("/get_events_new", methods = ['POST'])
+@token_required
+def get_events_new(current_user):
+    if request.method == 'POST':
+        user = User.query.filter_by(email = current_user.email).first()
+        events_db = Event.query.filter_by(created_by_user = user.id).all()
+
+        events = []
+        for event in events_db:
+            event_data = {}
+            event_data['id'] = event.id
+            event_data['title'] = event.title
+            event_data['startDate'] = event.date_start
+            event_data['endDate'] = event.date_end
+            event_data['isActive'] = event.isActive
+            event_data['feedbackCount'] = 10
+            event_data['rating1'] = int(1)
+            event_data['rating2'] = int(2)
+            event_data['rating3'] = int(4)
+            event_data['rating4'] = int(3)
+
+            events.append(event_data)
+
+        return jsonify({
+            "events": events
+        }), 200
 
 
 @application.route("/get_events", methods = ['POST'])

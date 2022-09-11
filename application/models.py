@@ -3,6 +3,7 @@ from flask import jsonify, request
 from sqlalchemy import null
 from application import db, login_manager
 from datetime import datetime
+from dateutil.tz import tzutc
 from flask_login import UserMixin
 
 
@@ -45,11 +46,12 @@ class User(db.Model, UserMixin):
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key = True)
-    pin_id = db.Column(db.Integer, nullable = False)
+    public_id = db.Column(db.String(50), unique = True)
+    pin = db.Column(db.Integer, nullable = False)
     title = db.Column(db.String(100), nullable = False)
-    date_posted = db.Column(db.DateTime, default=datetime.isoformat, nullable = False)
-    date_start = db.Column(db.DateTime, nullable = False)
-    date_end = db.Column(db.DateTime, nullable = False)
+    date_posted = db.Column(db.String, default = 'placeholder', nullable = False)
+    date_start = db.Column(db.String, nullable = False)
+    date_end = db.Column(db.String, nullable = False)
     description = db.Column(db.Text, nullable = True)
     isActive = db.Column(db.Integer, default = True)
     event_questions = db.relationship(
