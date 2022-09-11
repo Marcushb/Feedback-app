@@ -59,6 +59,11 @@ class Event(db.Model):
         foreign_keys = 'Question.parent_event',
         backref = 'event_questions'
     )
+    event_feedback = db.relationship(
+        'Feedback',
+        foreign_keys = 'Feedback.parent_event',
+        backref = 'event_feedback'
+    )
     created_by_user = db.Column(db.Integer, db.ForeignKey('user.id'))
 
     def __repr__(self):
@@ -73,10 +78,12 @@ class Question(db.Model):
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date_posted = db.Column(db.DateTime, default=datetime.utcnow(), nullable = False)
-    content = db.Column(db.Text, nullable=False)
+    date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
+    rating = db.Column(db.Integer, nullable = False)
+    content = db.Column(db.Text, nullable = True)
     answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     parent_question = db.Column(db.Integer, db.ForeignKey('question.id'))
+    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))
 
     def __repr__(self):
         return f"Answer('{self.content}')"

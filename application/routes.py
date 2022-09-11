@@ -1,4 +1,5 @@
 import json
+from queue import Empty
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
@@ -112,16 +113,7 @@ def login():
                 # har virket etc
         else:
             verified = verified.json()
-        """"
-        data = VerifyInput.check_keys(
-            check_type = 'object', 
-            keys_expected = ['userPrincipalName', 'displayName'],
-            data = verified
-            )
-        if data['result'] == 'error':
-            return jsonify(data)
-        """
-        # data = request.get_json('userPrincipalName, displayName')
+   
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
         user = User.query.filter_by(email = user_email).first()
         if not user:
@@ -183,7 +175,7 @@ def get_outlook_events(current_user):
         # data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
         # if data['result'] == 'error':
         #     return jsonify(data)
-        data = request.get_json('accessToken')
+        data = request.get_json(force = True)
         header = {"Authorization": f"Bearer {data['accessToken']}"}
         params = {
             'select': 'id, subject, bodyPreview, start, end, attendees, location'
@@ -276,13 +268,7 @@ def createEvent(current_user):
 
         db.session.commit()
 
-        return jsonify({
-                'title': f'{event.title}',
-                'description': f'{event.description}',
-                'creatorName': f'{event.user_events.name}',
-                'creatorEmail': f'{event.user_events.email}',
-                'eventPublic_id': f'{event.pin}',
-                }), 200
+        return {}, 200
 
     if request.method == 'PUT':
         """
@@ -332,43 +318,45 @@ def createEvent(current_user):
         # return jsonify({'statusCode': 200}), 200
 
 
-@application.route("/question/<app_id>", methods=['POST', 'GET'])
-@token_required
-def ask_question(current_user, app_id):
-    if request.method == 'POST':
+# @application.route("/question/<app_id>", methods=['POST', 'GET'])
+# @token_required
+# def ask_question(current_user, app_id):
+#     if request.method == 'POST':
         
-        user = User.query.filter_by(public_id = current_user.public_id).first()
-        event = Event.query.filter_by(app_id = app_id).first()
+#         user = User.query.filter_by(public_id = current_user.public_id).first()
+#         event = Event.query.filter_by(app_id = app_id).first()
 
-        question = Question(
-            question = request.get_json('question'),
-            asked_by_user = user.id,
-            parent_event = event.id
-        )
-        db.session.add(question)
-        db.session.commit()
+#         question = Question(
+#             question = request.get_json('question'),
+#             asked_by_user = user.id,
+#             parent_event = event.id
+#         )
+#         db.session.add(question)
+#         db.session.commit()
 
-        return question.question, 200
+#         return question.question, 200
 
 """
 Fiks kald
 """
 @application.route("/submit_feedback", methods = ['POST'])
-def give_feedback(question_id):
+def give_feedback():
     if request.method == 'POST':
-        question_ids = request.get_json('question')
-        parent_question = Question.query.filter_by(id = int(question_id)).first()
-        parent_user = User.query.filter_by(id = parent_question.asked_by_user).first()
+        data = request.get_json(force = True)
+        parent_question = Question.query.filter_by(id = data['question_id']).first()
+        parent_user_id = parent_question.asked_by_user
 
         feedback = Feedback(
-            content = request.get_json('content'),
-            answered_by_id = parent_user.id,
-            parent_question = parent_question.id
+            rating = data['rating'],
+            content = data['content'],
+            answered_by_id = parent_user_id,
+            parent_question = parent_question.id,
+            parent_event = parent_question.parent_event
         )
         db.session.add(feedback)
         db.session.commit()
 
-        return feedback.content
+        return {}, 200
 
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
@@ -398,78 +386,81 @@ def get_one_user(public_id):
     return jsonify({'user': user_data})
 
 
-@application.route("/get_events_new", methods = ['POST'])
+@application.route("/events", methods = ['GET'])
 @token_required
 def get_events_new(current_user):
-    if request.method == 'POST':
+    if request.method == 'GET':
         user = User.query.filter_by(email = current_user.email).first()
         events_db = Event.query.filter_by(created_by_user = user.id).all()
-
+        if len(events_db) == 0:
+            return jsonify({"response": []}), 200
         events = []
         for event in events_db:
             event_data = {}
+            feedback_data = Feedback.query.filter_by(parent_event = event.id).all()
+            feedback_rating = []
+            for feedback in feedback_data:
+                feedback_rating.append(feedback.rating)
             event_data['id'] = event.id
             event_data['title'] = event.title
             event_data['startDate'] = event.date_start
             event_data['endDate'] = event.date_end
             event_data['isActive'] = event.isActive
             event_data['feedbackCount'] = 10
-            event_data['rating1'] = int(1)
-            event_data['rating2'] = int(2)
-            event_data['rating3'] = int(4)
-            event_data['rating4'] = int(3)
+            event_data['rating1'] = feedback_rating.count(1)
+            event_data['rating2'] = feedback_rating.count(2)
+            event_data['rating3'] = feedback_rating.count(3)
+            event_data['rating4'] = feedback_rating.count(4)
 
             events.append(event_data)
 
-        return jsonify({
-            "events": events
-        }), 200
+        return jsonify({"response": events}), 200
 
 
-@application.route("/get_events", methods = ['POST'])
-def get_events():
-    if request.method == 'POST':
-        user = User.query.filter_by(id = request.get_json('id')['id']).first()
-        events_db = Event.query.filter_by(created_by_user = user.id).all()
+# @application.route("/get_events", methods = ['POST'])
+# def get_events():
+#     if request.method == 'POST':
+#         user = User.query.filter_by(id = request.get_json('id')['id']).first()
+#         events_db = Event.query.filter_by(created_by_user = user.id).all()
 
-        events = []
-        for event in events_db:
-            event_data = {}
-            event_data['title'] = event.title
-            event_data['date_posted'] = event.date_posted
-            event_data['description'] = event.description
-            event_data['isActive'] = event.isActive
-            event_data['']
+#         events = []
+#         for event in events_db:
+#             event_data = {}
+#             event_data['title'] = event.title
+#             event_data['date_posted'] = event.date_posted
+#             event_data['description'] = event.description
+#             event_data['isActive'] = event.isActive
+#             event_data['']
 
-            questions_db = Question.query.filter_by(parent_event = event.id).all()
-            questions = []
-            for question in questions_db:
-                question_data = {}
-                question_data['question'] = question.question
-                question_data['date_posted'] = question.date_posted
+#             questions_db = Question.query.filter_by(parent_event = event.id).all()
+#             questions = []
+#             for question in questions_db:
+#                 question_data = {}
+#                 question_data['question'] = question.question
+#                 question_data['date_posted'] = question.date_posted
 
-                feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
-                feedbacks = []
-                for feedback in feedbacks_db:
-                    feedback_data = {}
-                    feedback_data['content'] = feedback.content
-                    feedback_data['date_posted'] = feedback.date_posted
-                    feedbacks.append(feedback_data)
+#                 feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
+#                 feedbacks = []
+#                 for feedback in feedbacks_db:
+#                     feedback_data = {}
+#                     feedback_data['content'] = feedback.content
+#                     feedback_data['date_posted'] = feedback.date_posted
+#                     feedbacks.append(feedback_data)
 
-                question_data['feedbacks'] = feedbacks
-                questions.append(question_data)
+#                 question_data['feedbacks'] = feedbacks
+#                 questions.append(question_data)
 
-            event_data['questions'] = questions
+#             event_data['questions'] = questions
 
-            events.append(event_data)
+#             events.append(event_data)
 
-        return jsonify({'email': user.email, 'events': events})
+#         return jsonify({'email': user.email, 'events': events})
 
 
-@application.route("/get_event/<event_pin>", methods = ['GET'])
-def get_event(event_pin):
+@application.route("/events/<id>", methods = ['GET'])
+def get_event(id):
     if request.method == 'GET':
-        event = Event.query.filter_by(app_id = event_pin).all()
+        event = Event.query.filter_by(pin = id).all()
         questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
         for question in questions_db:
