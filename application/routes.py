@@ -460,7 +460,7 @@ def get_events_new(current_user):
 @application.route("/events/<id>", methods = ['GET'])
 def get_event(id):
     if request.method == 'GET':
-        event = Event.query.filter_by(pin = id).all()
+        event = Event.query.filter_by(id = id).all()
         questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
         for question in questions_db:
