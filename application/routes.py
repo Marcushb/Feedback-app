@@ -2,6 +2,7 @@ import json
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response
+from application.functions import change_event
 import requests
 import uuid
 import jwt
@@ -44,15 +45,13 @@ def token_required(f):
 @application.route("/", methods=['POST'])
 def home():
     if request.method == 'POST':
-        input_check = request.get_json('title')
-        # input_check = VerifyInput.check_keys(keys_expected = ['title'], check_type = 'request')
-        return input_check
-        # if input_check['result'] == 'error':
-        #     return jsonify(input_check)
-        # else:
-        #     return input_check
-        # return VerifyInput.validate_input(method = 'POST', data_expected = ['title', "question"])
 
+        # user = User.query.filter_by(email = "test_email@live.dk").first()
+        # user.name = "changed_name"
+        
+        # db.session.commit()
+
+        return 'Hello'
 @application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
@@ -107,7 +106,7 @@ def login():
             return jsonify({
                 'message': verified.json()['error']['code'],
                 'statusCode': verified.status_code
-            })
+            }), verified.status_code
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
                 # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
                 # har virket etc
@@ -142,6 +141,10 @@ def login():
             db.session.add(new_user)
             db.session.commit()
             user = User.query.filter_by(email = user_email).first()
+        else:
+            user.email = user_email
+            user.name = user_name
+            db.session.commit()
 
         # For at definere expiration time
         # 'exp': datetime.datetime.utcnow(
@@ -154,7 +157,7 @@ def login():
                 'jwtToken': user.jwt_token,
                 'email': user.email,
                 'name': user.name
-        })
+        }), 200
 
     # if request.method == 'POST':
     #     user = User.query.filter_by(email=request.form['email']).first()
@@ -253,7 +256,7 @@ def createEvent(current_user):
         if data['result'] == 'error':
             return jsonify(data)
         event = Event(
-            app_id = random.randint(0, 9999),
+            event_pin = random.randint(0, 9999),
             title = data['title'],
             # date_start = request.form['date_start'],
             # date_end = datetime request.form['date_end'],
@@ -264,15 +267,17 @@ def createEvent(current_user):
 
         questions = request.get_json('question')
         # FIND LØSNING PÅ LOOP OVER QUESTIONS 
-        if isinstance(question, str):
-            question_db = Question(
-                question = question,
-                asked_by_user = user.id,
-                parent_event = event.id
-            )
-            db.session.add(question_db)
+        # if isinstance(questions, str):
+        #     question_db = Question(
+        #         question = question,
+        #         asked_by_user = user.id,
+        #         parent_event = event.id
+        #     )
+        #     db.session.add(question_db)
 
-        elif isinstance(question, list):
+        # elif isinstance(questions, list):
+        # FORVENT ALTID LISTE, TJEK DET ER SANDT
+        if isinstance(question, list):
             for question in questions:
                 question_db = Question(
                     question = question,
@@ -290,18 +295,19 @@ def createEvent(current_user):
                 'creatorEmail': f'{event.user_events.email}',
                 'eventPublic_id': f'{event.app_id}',
                 'statusCode': 200
-                })
+                }), 200
 
     if request.method == 'PUT':
+        """
         data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['appId'])
         if data['result'] == 'error':
             return data
         event = Event.query.filter_by(app_id = data['appId']).first()
-        """
-        Lav funktion der verificerer at de sendte parametre er parametre der kan ændres.
-        F.eks for Event skal den tjekke, at keys i de sendte parametre i request.form[]
-        er i listen ['title', 'date_start', 'date_end', 'description'] 
-        """
+    
+        # Lav funktion der verificerer at de sendte parametre er parametre der kan ændres.
+        # F.eks for Event skal den tjekke, at keys i de sendte parametre i request.form[]
+        # er i listen ['title', 'date_start', 'date_end', 'description'] 
+        
         keys_accepted = VerifyInput.check_overwrite_keys(
             keys_overwrite = [request.get_json('keys_overwrite')], 
             keys_accepted = constant.db_overwrite_params['Event']
@@ -310,7 +316,33 @@ def createEvent(current_user):
             return jsonify(keys_accepted)
         else:
             return 'keys overwrite accepted'
+        """
+        event = Event.query.filter_by(app_id = request.get_json('app_id'))
+        ow_params = constant.db_overwrite_params['Event']
+        # vals = [request.get_json(f'{var}') for var in ow_params]
+        vals = request.get_json('title')
+        print(vals)
+        return 'word'
+        # event_title = vals[ow_params == 'title']
+        # event_date_start = vals[ow_params == 'date_start']
+        # event_date_end = vals[ow_params == 'date_start']
+        # event_description = vals[ow_params == 'description']
 
+        # for var in ow_params:
+        #     var_change = "_".join(["event", var])
+        #     if f'{var_change}' == None:
+        #         continue
+        #     match var_change:
+        #         case 'title':
+        #             event.title = event_title
+        #         case 'date_start':
+        #             event.date_start = event_date_start
+        #         case 'date_end':
+        #             event.date_end = event_date_end
+        #         case 'description':
+        #             event.description = event_description
+        # db.session.commit()
+        # return jsonify({'statusCode': 200}), 200
 
 
 @application.route("/question/<app_id>", methods=['POST', 'GET'])
@@ -331,9 +363,13 @@ def ask_question(current_user, app_id):
 
         return question.question, 200
 
-@application.route("/feedback/<question_id>", methods = ['POST'])
+"""
+Fiks kald
+"""
+@application.route("/submit_feedback", methods = ['POST'])
 def give_feedback(question_id):
     if request.method == 'POST':
+        question_ids = request.get_json('question')
         parent_question = Question.query.filter_by(id = int(question_id)).first()
         parent_user = User.query.filter_by(id = parent_question.asked_by_user).first()
 
@@ -374,10 +410,11 @@ def get_one_user(public_id):
 
     return jsonify({'user': user_data})
 
+
 @application.route("/get_events", methods = ['POST'])
 def get_events():
     if request.method == 'POST':
-        user = User.query.filter_by(id = request.get_json('id')).first()
+        user = User.query.filter_by(id = request.get_json('id')['id']).first()
         events_db = Event.query.filter_by(created_by_user = user.id).all()
 
         events = []
@@ -387,6 +424,7 @@ def get_events():
             event_data['date_posted'] = event.date_posted
             event_data['description'] = event.description
             event_data['isActive'] = event.isActive
+            event_data['']
 
             questions_db = Question.query.filter_by(parent_event = event.id).all()
             questions = []
@@ -412,10 +450,11 @@ def get_events():
 
         return jsonify({'email': user.email, 'events': events})
 
-@application.route("/get_event/<app_id>", methods = ['GET'])
-def get_event(app_id):
+
+@application.route("/get_event/<event_pin>", methods = ['GET'])
+def get_event(event_pin):
     if request.method == 'GET':
-        event = Event.query.filter_by(app_id = app_id).all()
+        event = Event.query.filter_by(app_id = event_pin).all()
         questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
         for question in questions_db:
@@ -427,7 +466,7 @@ def get_event(app_id):
             'event_descrption': event.description,
             'questions': questions
         }
-        return event_object
+        return event_object, 200
 
 
 @application.route("/test", methods = ["POST"])
