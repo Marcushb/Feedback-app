@@ -236,7 +236,7 @@ def get_outlook_events(current_user):
         }), 401
 
 
-@application.route("/create_event", methods = ['POST', 'PUT'])
+@application.route("/create_event", methods = ['POST'])
 @token_required
 def createEvent(current_user):
     if request.method == 'POST':
@@ -270,53 +270,47 @@ def createEvent(current_user):
 
         return {}, 200
 
+
+@application.route("/modify_event", methods = ['PUT', 'DELETE'])
+@token_required
+def modify_event(current_user):
+    data = request.get_json(force = True)
+
     if request.method == 'PUT':
-        """
-        data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['appId'])
-        if data['result'] == 'error':
-            return data
-        event = Event.query.filter_by(app_id = data['appId']).first()
+        event = Event.query.filter_by(id = data['ID']).first()
+        event.title = data['title']
+        event.date_start = data['startDate']
+        event.date_end = data['endDate']
+        event.description = data['description']
+        db.session.commit()
+
+        return {}, 200
     
-        # Lav funktion der verificerer at de sendte parametre er parametre der kan ændres.
-        # F.eks for Event skal den tjekke, at keys i de sendte parametre i request.form[]
-        # er i listen ['title', 'date_start', 'date_end', 'description'] 
-        
-        keys_accepted = VerifyInput.check_overwrite_keys(
-            keys_overwrite = [request.get_json('keys_overwrite')], 
-            keys_accepted = constant.db_overwrite_params['Event']
-            )
-        if keys_accepted:
-            return jsonify(keys_accepted)
-        else:
-            return 'keys overwrite accepted'
-        """
-        event = Event.query.filter_by(app_id = request.get_json('app_id'))
-        ow_params = constant.db_overwrite_params['Event']
-        # vals = [request.get_json(f'{var}') for var in ow_params]
-        vals = request.get_json('title')
-        print(vals)
-        return 'word'
-        # event_title = vals[ow_params == 'title']
-        # event_date_start = vals[ow_params == 'date_start']
-        # event_date_end = vals[ow_params == 'date_start']
-        # event_description = vals[ow_params == 'description']
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            event = Event.query.filter_by(id = id).delete()
+        db.session.commit()
 
-        # for var in ow_params:
-        #     var_change = "_".join(["event", var])
-        #     if f'{var_change}' == None:
-        #         continue
-        #     match var_change:
-        #         case 'title':
-        #             event.title = event_title
-        #         case 'date_start':
-        #             event.date_start = event_date_start
-        #         case 'date_end':
-        #             event.date_end = event_date_end
-        #         case 'description':
-        #             event.description = event_description
-        # db.session.commit()
-        # return jsonify({'statusCode': 200}), 200
+        return {}, 200
 
+@application.route("/modify_question", methods = ['PUT', 'DELETE'])
+@token_required
+def modify_question(current_user):
+    data = request.get_json(force = True)
+
+    if request.method == 'PUT':
+        question = Event.query.filter_by(id = data['ID']).first()
+        question.description = data['description']
+        db.session.commit()
+
+        return {}, 200
+    
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            question = Question.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
 
 # @application.route("/question/<app_id>", methods=['POST', 'GET'])
 # @token_required
@@ -336,28 +330,6 @@ def createEvent(current_user):
 
 #         return question.question, 200
 
-"""
-Fiks kald
-"""
-@application.route("/submit_feedback", methods = ['POST'])
-def give_feedback():
-    if request.method == 'POST':
-        data = request.get_json(force = True)
-        parent_question = Question.query.filter_by(id = data['question_id']).first()
-        parent_user_id = parent_question.asked_by_user
-
-        feedback = Feedback(
-            rating = data['rating'],
-            content = data['content'],
-            answered_by_id = parent_user_id,
-            parent_question = parent_question.id,
-            parent_event = parent_question.parent_event
-        )
-        db.session.add(feedback)
-        db.session.commit()
-
-        return {}, 200
-
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
     users = User.query.all()
@@ -369,7 +341,7 @@ def get_all_users():
         user_data['email'] = user.email
         output.append(user_data)
 
-    return jsonify({'users': output})
+    return jsonify({'users': output}), 200
 
 @application.route("/get_one_user/<public_id>", methods=['GET'])
 def get_one_user(public_id):
@@ -383,7 +355,7 @@ def get_one_user(public_id):
     user_data['name'] = user.name
     user_data['email'] = user.email
 
-    return jsonify({'user': user_data})
+    return jsonify({'user': user_data}), 200
 
 
 @application.route("/events", methods = ['GET'])
@@ -405,74 +377,97 @@ def get_events_new(current_user):
             event_data['title'] = event.title
             event_data['startDate'] = event.date_start
             event_data['endDate'] = event.date_end
-            event_data['isActive'] = event.isActive
-            event_data['feedbackCount'] = 10
+            event_data['feedbackCount'] = len(feedback_rating)
             event_data['rating1'] = feedback_rating.count(1)
             event_data['rating2'] = feedback_rating.count(2)
             event_data['rating3'] = feedback_rating.count(3)
             event_data['rating4'] = feedback_rating.count(4)
+
+            #Fiks datetime format så sammenligning er mulig
+            if (event_data['isActive'] == True and 
+            datetime.utcnow() > (event_data['startDate'] + 30*60)): 
+                event_data['isActive'] = False
+            else:
+                event_data['isActive'] = event.isActive
 
             events.append(event_data)
 
         return jsonify({"response": events}), 200
 
 
-# @application.route("/get_events", methods = ['POST'])
-# def get_events():
-#     if request.method == 'POST':
-#         user = User.query.filter_by(id = request.get_json('id')['id']).first()
-#         events_db = Event.query.filter_by(created_by_user = user.id).all()
-
-#         events = []
-#         for event in events_db:
-#             event_data = {}
-#             event_data['title'] = event.title
-#             event_data['date_posted'] = event.date_posted
-#             event_data['description'] = event.description
-#             event_data['isActive'] = event.isActive
-#             event_data['']
-
-#             questions_db = Question.query.filter_by(parent_event = event.id).all()
-#             questions = []
-#             for question in questions_db:
-#                 question_data = {}
-#                 question_data['question'] = question.question
-#                 question_data['date_posted'] = question.date_posted
-
-#                 feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
-#                 feedbacks = []
-#                 for feedback in feedbacks_db:
-#                     feedback_data = {}
-#                     feedback_data['content'] = feedback.content
-#                     feedback_data['date_posted'] = feedback.date_posted
-#                     feedbacks.append(feedback_data)
-
-#                 question_data['feedbacks'] = feedbacks
-#                 questions.append(question_data)
-
-#             event_data['questions'] = questions
-
-#             events.append(event_data)
-
-#         return jsonify({'email': user.email, 'events': events})
-
-
 @application.route("/events/<id>", methods = ['GET'])
-def get_event(id):
+@token_required
+def get_events(current_user, id):
     if request.method == 'GET':
-        event = Event.query.filter_by(id = id).all()
+        
+        event = Event.query.filter_by(id = id).first()
+        event_data = {}
+        event_data['title'] = event.title
+        event_data['date_posted'] = event.date_posted
+        event_data['description'] = event.description
+        event_data['isActive'] = event.isActive
+
         questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
         for question in questions_db:
             question_data = {}
-            question_data['question'] = question.question
-        
-        event_object = {
-            'event_title': event.title,
-            'event_descrption': event.description,
-            'questions': questions
-        }
-        return event_object, 200
+            question_data['question'] = question.description
+
+            feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
+            feedbacks = []
+            for feedback in feedbacks_db:
+                feedback_data = {}
+                feedback_data['rating'] = feedback.rating
+                feedback_data['content'] = feedback.content
+                feedbacks.append(feedback_data)
+
+            question_data['feedbacks'] = feedbacks
+            questions.append(question_data)
+            
+        event_data['questions'] = questions
+
+        return jsonify({'response': event_data}), 200
+
+
+@application.route("/initialize_session/<pin>", methods = ["POST"])
+def initialize_session(pin):
+    if request.metod == 'POST':
+        event = Event.query.filter_by(pin = pin).first()
+        event_data = {}
+        event_data['title'] = event.title
+        event_data['date_posted'] = event.date_posted
+        event_data['description'] = event.description
+        event_data['isActive'] = event.isActive
+
+        questions_db = Question.query.filter_by(parent_event = event.id).all()
+        questions = []
+        for question in questions_db:
+            question_data = {}
+            question_data['question'] = question.description
+            questions.append(question_data)
+        event_data['questions'] = questions
+
+        return jsonify({'response': event_data}), 200
+
+
+@application.route("/submit_feedback", methods = ['POST'])
+def give_feedback():
+    if request.method == 'POST':
+        data = request.get_json(force = True)
+        parent_question = Question.query.filter_by(id = data['questionId']).first()
+        parent_user_id = parent_question.asked_by_user
+
+        feedback = Feedback(
+            rating = data['rating'],
+            content = data['content'],
+            answered_by_id = parent_user_id,
+            parent_question = parent_question.id,
+            parent_event = parent_question.parent_event
+        )
+        db.session.add(feedback)
+        db.session.commit()
+
+        return {}, 200
 
 
 @application.route("/test", methods = ["POST"])

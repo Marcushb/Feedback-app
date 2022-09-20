@@ -73,17 +73,17 @@ class Question(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     description = db.Column(db.Text, nullable = False)
     question_answers = db.relationship('Feedback', foreign_keys = 'Feedback.parent_question', backref = 'question_answers', lazy = True)
-    asked_by_user = db.Column(db.Integer, db.ForeignKey('user.id'))
-    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))
+    asked_by_user = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = True)
+    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'), nullable = True)
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
     rating = db.Column(db.Integer, nullable = False)
     content = db.Column(db.Text, nullable = True)
-    answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    parent_question = db.Column(db.Integer, db.ForeignKey('question.id'))
-    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'))
+    answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = True)
+    parent_question = db.Column(db.Integer, db.ForeignKey('question.id'), nullable = True)
+    parent_event = db.Column(db.Integer, db.ForeignKey('event.id'), nullable = True)
 
     def __repr__(self):
         return f"Answer('{self.content}')"
