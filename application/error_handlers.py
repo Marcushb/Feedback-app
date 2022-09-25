@@ -13,6 +13,7 @@ def not_found(e):
 def method_not_allowed(e):
     return jsonify({
         'errorMessage': f'{e}',
+        'route': f'{request.url}',
         'statusCode': 405
     })
 
@@ -20,5 +21,6 @@ def method_not_allowed(e):
 def server_error(e):
     return jsonify({
         'errorMessage': f'{e}',
+        'route': f'{request.url}',
         'statusCode': 500
     })

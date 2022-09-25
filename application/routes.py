@@ -9,7 +9,7 @@ import uuid
 import jwt
 from functools import wraps
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil import parser
 # random.seed(42)
 db.create_all()
@@ -384,8 +384,9 @@ def get_events_new(current_user):
             event_data['rating4'] = feedback_rating.count(4)
 
             #Fiks datetime format så sammenligning er mulig
-            if (event_data['isActive'] == True and 
-            datetime.utcnow() > (event_data['startDate'] + 30*60)): 
+            endDate = datetime.strptime(event.date_end, "%Y-%m-%dT%H:%M:%SZ")
+            cap_time = endDate + timedelta(minutes = 30)
+            if (event_data['isActive'] == True and datetime.utcnow() > cap_time): 
                 event_data['isActive'] = False
             else:
                 event_data['isActive'] = event.isActive
@@ -433,21 +434,28 @@ def get_events(current_user, id):
 def initialize_session(pin):
     if request.metod == 'POST':
         event = Event.query.filter_by(pin = pin).first()
-        event_data = {}
-        event_data['title'] = event.title
-        event_data['date_posted'] = event.date_posted
-        event_data['description'] = event.description
-        event_data['isActive'] = event.isActive
+        if event:
+            event_data = {}
+            event_data['title'] = event.title
+            event_data['date_posted'] = event.date_posted
+            event_data['description'] = event.description
+            event_data['isActive'] = event.isActive
 
-        questions_db = Question.query.filter_by(parent_event = event.id).all()
-        questions = []
-        for question in questions_db:
-            question_data = {}
-            question_data['question'] = question.description
-            questions.append(question_data)
-        event_data['questions'] = questions
+            questions_db = Question.query.filter_by(parent_event = event.id).all()
+            questions = []
+            for question in questions_db:
+                question_data = {}
+                question_data['question'] = question.description
+                questions.append(question_data)
+            event_data['questions'] = questions
 
-        return jsonify({'response': event_data}), 200
+            return jsonify({'response': event_data}), 200
+        else:
+            return jsonify({
+                'errorMessage': f'Pin {pin} is not valid',
+                'route': f'{request.url}',
+                'statusCode': 404
+                })
 
 
 @application.route("/submit_feedback", methods = ['POST'])
