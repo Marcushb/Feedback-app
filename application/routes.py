@@ -3,7 +3,7 @@ from queue import Empty
 from application.models import User, Event, Question, Feedback, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
-from application.functions import change_event
+from application.functions import change_event, check_isActive_expired
 import requests
 import uuid
 import jwt
@@ -24,7 +24,8 @@ def token_required(f):
 
         if not jwt_token:
             return jsonify({
-                'message': 'Token is missing',
+                'errorMessage': 'Token is missing',
+                'route': f'{request.url}',
                 'statusCode': 401
                 }), 401
 
@@ -35,7 +36,8 @@ def token_required(f):
             current_user = User.query.filter_by(email = data['email']).first()
         except:
             return jsonify({
-                'message': 'Token does not match',
+                'errorMessage': 'Token does not match',
+                'route': f'{request.url}',
                 'statusCode': 401})
 
         return f(current_user, *args, **kwargs)
@@ -288,6 +290,9 @@ def modify_event(current_user):
     
     if request.method == 'DELETE':
         for id in data['ID']:
+            event = Event.query.filter_by(id = id).first()
+            questions = Question.query.filter_by(parent_event = id).delete()
+            feedbacks = Feedback.query.filter_by(parent_event = id).delete()
             event = Event.query.filter_by(id = id).delete()
         db.session.commit()
 
@@ -307,6 +312,35 @@ def modify_question(current_user):
     
     if request.method == 'DELETE':
         for id in data['ID']:
+            question = Question.query.filter_by(id = id).first()
+            feedbacks = Feedback.query.filter_by(parent_question = id).delete()
+            question = Question.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
+
+@application.route("/modify_feedback", methods = ['PUT', 'DELETE'])
+@token_required
+def modify_feedback(current_user):
+    data = request.get_json(force = True)
+
+    if request.method == 'PUT':
+        feedback = Feedback.query.filter_by(id = data['ID']).first()
+        feedback.rating = data['rating']
+        feedback.content = data['content']
+        db.session.commit()
+
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            feedback = Feedback.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
+    
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            question = Question.query.filter_by(id = id).first()
+            feedbacks = Feedback.query.filter_by(parent_question = id).delete()
             question = Question.query.filter_by(id = id).delete()
         db.session.commit()
 
@@ -382,14 +416,11 @@ def get_events_new(current_user):
             event_data['rating2'] = feedback_rating.count(2)
             event_data['rating3'] = feedback_rating.count(3)
             event_data['rating4'] = feedback_rating.count(4)
-
-            #Fiks datetime format så sammenligning er mulig
-            endDate = datetime.strptime(event.date_end, "%Y-%m-%dT%H:%M:%SZ")
-            cap_time = endDate + timedelta(minutes = 30)
-            if (event_data['isActive'] == True and datetime.utcnow() > cap_time): 
-                event_data['isActive'] = False
-            else:
-                event_data['isActive'] = event.isActive
+            event_data['isActive'] = check_isActive_expired(
+                event.isActive,
+                event.date_end,
+                constant.expiration_min
+                )
 
             events.append(event_data)
 
@@ -406,7 +437,11 @@ def get_events(current_user, id):
         event_data['title'] = event.title
         event_data['date_posted'] = event.date_posted
         event_data['description'] = event.description
-        event_data['isActive'] = event.isActive
+        event_data['isActive'] = check_isActive_expired(
+            event.isActive,
+            event.date_end,
+            constant.expiration_min
+        )
 
         questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
@@ -432,14 +467,24 @@ def get_events(current_user, id):
 
 @application.route("/initialize_session/<pin>", methods = ["POST"])
 def initialize_session(pin):
-    if request.metod == 'POST':
+    if request.method == 'POST':
         event = Event.query.filter_by(pin = pin).first()
         if event:
             event_data = {}
+            event_data['isActive'] = check_isActive_expired(
+                event.isActive,
+                event.date_end,
+                constant.expiration_min
+                )
+            if event_data['isActive'] == False:
+                return jsonify({
+                    'errorMessage': f'Pin {pin} is not valid',
+                    'route': f'{request.url}',
+                    'statusCode': 410
+                    }), 410
             event_data['title'] = event.title
             event_data['date_posted'] = event.date_posted
             event_data['description'] = event.description
-            event_data['isActive'] = event.isActive
 
             questions_db = Question.query.filter_by(parent_event = event.id).all()
             questions = []
@@ -455,14 +500,14 @@ def initialize_session(pin):
                 'errorMessage': f'Pin {pin} is not valid',
                 'route': f'{request.url}',
                 'statusCode': 404
-                })
+                }), 404
 
 
 @application.route("/submit_feedback", methods = ['POST'])
 def give_feedback():
     if request.method == 'POST':
         data = request.get_json(force = True)
-        parent_question = Question.query.filter_by(id = data['questionId']).first()
+        parent_question = Question.query.filter_by(id = data['questionID']).first()
         parent_user_id = parent_question.asked_by_user
 
         feedback = Feedback(

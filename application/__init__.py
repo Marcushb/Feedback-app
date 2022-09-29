@@ -19,6 +19,6 @@ from application import error_handlers
 
 
 
-ngrok = True
+ngrok = False
 if ngrok:
     run_with_ngrok(application)

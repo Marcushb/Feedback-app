@@ -49,7 +49,7 @@ class Event(db.Model):
     public_id = db.Column(db.String(50), unique = True)
     pin = db.Column(db.Integer, nullable = False)
     title = db.Column(db.String(100), nullable = False)
-    date_posted = db.Column(db.String, default = 'placeholder', nullable = False)
+    date_posted = db.Column(db.String, default = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"), nullable = False)
     date_start = db.Column(db.String, nullable = False)
     date_end = db.Column(db.String, nullable = False)
     description = db.Column(db.Text, nullable = True)
