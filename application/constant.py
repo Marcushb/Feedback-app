@@ -15,4 +15,4 @@ urls = {
 
 datetime_format = ""
 
-expiration_min = 5
+expiration_min = 1e5
