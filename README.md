@@ -179,7 +179,7 @@ If Method is <ins>__PUT__ </ins>:
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{string}` `[body]` `(required)`
+>* ID `{integer}` `[body]` `(required)`
 >* title `{string}` `[body]`
 >* startDate `{string}` `[body]`
 >* endDate `{string}` `[body]`
@@ -211,7 +211,7 @@ If Method is <ins>__DELETE__ </ins>:
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{list of string(s)}` `[body]` `(required)`
+>* ID `{list of integer(s)}` `[body]` `(required)`
 
 <ins> Returns </ins>:
 
@@ -245,7 +245,7 @@ If Method is <ins>__PUT__ </ins>:
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{string}` `[body]` `(required)`
+>* ID `{integer}` `[body]` `(required)`
 >* description `{string}` `[body]`
 
 <ins> Returns </ins>:
@@ -271,7 +271,7 @@ If Method is <ins>__DELETE__ </ins>:
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{list of string(s)}` `[body]` `(required)`
+>* ID `{list of integer(s)}` `[body]` `(required)`
 
 <ins> Returns </ins>:
 
@@ -285,3 +285,159 @@ If Method is <ins>__DELETE__ </ins>:
 * Given the `ID(s)` of existing question(s), this allows the owner of an event to delete 
 the question(s) corresponding to the `ID(s)`, along with all given feedback 
 associated with the question(s).
+
+
+
+### **Get events**
+<br/>
+
+<ins> General information </ins>
+
+>* Route: `/events`
+>* Methods: `GET`
+
+<ins> Parameters: </ins>
+
+>* x-access-token `{string}` `[header]`
+
+<ins> Returns: </ins>
+
+* `response` object which for each event contains:
+>* id `{integer}`
+>* title `{string}`
+>* startDate `{string}`
+>* endDate `{string}`
+>* feedbackCount `{integer}`
+>* rating1 `{integer}`
+>* rating2 `{integer}`
+>* rating3 `{integer}`
+>* rating4 `{integer}`
+>* isActive `{logical}`
+
+```
+{
+    "response": [
+        {
+            "id": 1,
+            "title": "Title of event",
+            "startDate": "2022-01-04T11:30:00Z",
+            "endDate": "2022-01-04T11:45:00Z",
+            "feedbackCount": "10",
+            "rating1": 1,
+            "rating2": 1,
+            "rating3": 4,
+            "rating4": 2,
+            "isActive": True
+        },
+        {
+            "id": 12,
+            "title": "Title of another event",
+            "startDate": "2022-12-05T07:50:00Z",
+            "endDate": "2022-12-05T08:00:00Z",
+            "feedbackCount": "5",
+            "rating1": 0,
+            "rating2": 0,
+            "rating3": 2,
+            "rating4": 3,
+            "isActive": False
+        },
+    ]
+}
+```
+
+
+<ins> Purpose: </ins>
+
+* Returns information of all events a user has created. This is used to display general
+event information on the home screen of the user, showing general information about the
+event. This includes a count of the amount of received feedback on all questions the event contains, as well as some general information about the distribution of the ratings.
+
+
+---
+<br/>
+
+
+
+### **Get specific event**
+<br/>
+
+<ins> General information </ins>
+
+>* Route: `/events/<id>`
+>* Methods: `GET`
+
+<ins> Parameters: </ins>
+
+>* x-access-token `{string}` `[header]`
+>* id `{integer}` `[url]`
+
+<ins> Returns: </ins>
+
+* `response` object which contains:
+>* title `{string}`
+>* startDate `{string}`
+>* endDate `{string}`
+>* description `{string}`
+>* isActive `{logical}`
+>* questions `{list of strings}`
+>    * rating
+>    * content
+
+```
+{
+    "response": [
+        {
+            "title": "Title of event",
+            "startDate": "2022-01-04T11:30:00Z",
+            "endDate": "2022-01-04T11:45:00Z",
+            "description": "description of event",
+            "isActive": True,
+            "questions": [
+                {
+                    "question": "What did you think of the event overall?",
+                    "feedbacks": [
+                        {
+                            "rating": 4,
+                            "content": "Event was very informative on the subject"
+                        },
+                        {
+                            "rating": 3,
+                            "content": "Solid event, however more in-depth analysis would have elevated it"
+                        }
+                    ]
+                },
+                                {
+                    "question": "Did the presenter involve the audicence?",
+                    "feedbacks": [
+                        {
+                            "rating": 3,
+                            "content": "The presenter was made sure, that..."
+                        },
+                        {
+                            "rating": 2,
+                            "content": "I did not personally feel a strong engagement"
+                        }
+                    ]
+                }
+            ]
+        },
+            "title": "Title of event2",
+            "startDate": "2022-01-04T11:30:00Z",
+            "endDate": "2022-01-04T11:45:00Z",
+            "description": "description of event2",
+            "isActive": False,
+            "questions": []
+        },
+    ]
+}
+```
+
+
+<ins> Purpose: </ins>
+
+* Returns all information of a specific event. This includes all questions related to the
+event, as well as all feedback related to each individual question.
+
+
+---
+<br/>

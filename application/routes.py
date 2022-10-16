@@ -435,7 +435,8 @@ def get_events(current_user, id):
         event = Event.query.filter_by(id = id).first()
         event_data = {}
         event_data['title'] = event.title
-        event_data['date_posted'] = event.date_posted
+        event_data['startDate'] = event.date_start
+        event_data['endDate'] = event.date_end
         event_data['description'] = event.description
         event_data['isActive'] = check_isActive_expired(
             event.isActive,
