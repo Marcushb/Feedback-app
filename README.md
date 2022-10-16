@@ -23,6 +23,14 @@
 >* email `{string}`
 >* name `{string}`
 
+```
+{
+    "jwtToken": "andlnawlaw32525kwnlkn.awdawjdo115m.fdnalnfd",
+    "email": "example_email@outlook.com",
+    "name": "Firstname Lastname"
+}
+```
+
 <ins> Purpose </ins>:
 
 * A user is logged in to Microsoft by use of the received `accessToken`. If the user
@@ -49,7 +57,7 @@ If this is the case, `None/nill` is returned in the `name`, instead of an empty 
 
 <ins> Returns: </ins>
 
-* `response` object containing:
+* `response` object which for each meeting contains:
 >* id `{string}`
 >* subject `{string}`
 >* bodyPreview `{string}`
@@ -59,6 +67,57 @@ If this is the case, `None/nill` is returned in the `name`, instead of an empty 
 >* attendees `{list of object(s)}`
 >   * email `{string}`
 >   * name `{string}`
+
+```
+{
+    "response": [
+        {
+            "attendees": [
+                {
+                    "email": "email1@outloook.com",
+                    "name": "Firstname1 Lastname1"
+                },
+                {
+                    "email": "email2@outlook.com",
+                    "name": "Firstname2 Lastname2"
+                }
+            ],
+            "bodyPreview": "A description of the scheduled meeting",
+            "endTime": "2022-01-04T11:30:00Z",
+            "id": "AQMkADAwYjQxLTA1L7qaFAoaDaFAJIaTsABQbAAA=",
+            "location": "SomePlace",
+            "startTime": "2022-01-04T11:00:00Z",
+            "subject": "The subject of the meeting"            
+        },
+        {
+            "attendees": [
+                {
+                    "email": "email1@outloook.com",
+                    "name": "Firstname1 Lastname1"
+                },
+                {
+                    "email": "email2@outlook.com",
+                    "name": "Firstname2 Lastname2"
+                },
+                {
+                    "email": "email3@outlook.com",
+                    "name": "Firstname3 Lastname3"
+                },
+                {
+                    "email": "email4@outlook.com",
+                    "name": "Firstname4 Lastname4"
+                }
+            ],
+            "bodyPreview": "A description of the scheduled meeting",
+            "endTime": "2022-10-20T11:30:00Z",
+            "id": "AQMkADAwYjQxLTA1L7qaFAoaDaFAJIaTsABQbAAA=",
+            "location": "SomePlace",
+            "startTime": "2022-10-20T11:45:00Z",
+            "subject": "The subject of the meeting"            
+        }
+    ]
+}
+```
 
 
 <ins> Purpose: </ins>
