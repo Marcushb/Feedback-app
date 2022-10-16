@@ -194,12 +194,24 @@ If Method is <ins>__PUT__ </ins>:
 
 <br/>
 
+<ins> Purpose </ins>:
+
+* Given the `ID` of an existing event, this allows the owner of the event to change the 
+contents of said event.
+Parameters available to be changed/overwritten, as listed above, are:
+    * `title`
+    * `startDate`
+    * `endDate`
+    * `description`
+
+<br/>
+
 If Method is <ins>__DELETE__ </ins>:
 
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{list of strings}` `[body]` `(required)`
+>* ID `{list of string(s)}` `[body]` `(required)`
 
 <ins> Returns </ins>:
 
@@ -210,16 +222,6 @@ If Method is <ins>__DELETE__ </ins>:
 
 <ins> Purpose </ins>:
 
-__PUT__:
-* Given the `ID` of an existing event, this allows the owner of the event to change the 
-contents of said event.
-Parameters available to be changed/overwritten, as listed above, are:
-    * `title`
-    * `startDate`
-    * `endDate`
-    * `description`
-
-__DELETE__:
 * Given the `ID(s)` of an existing event, this allows the owner of an event to delete the
 event(s) corresponding to the `ID(s)`, along with every question and given feedback 
 associated with the event(s).
@@ -255,12 +257,21 @@ If Method is <ins>__PUT__ </ins>:
 
 <br/>
 
+<ins> Purpose </ins>:
+
+* Given the `ID` of an existing question belonging to an event, this allows the owner of 
+the event to change the description of the question.
+Parameter available to be changed/overwritten, as listed above, are:
+    * `description`
+
+<br/>
+
 If Method is <ins>__DELETE__ </ins>:
 
 <ins> Parameters </ins>:
 
 >* x-access-token `{string}` `[header]` `(required)`
->* ID `{list of strings}` `[body]` `(required)`
+>* ID `{list of string(s)}` `[body]` `(required)`
 
 <ins> Returns </ins>:
 
@@ -271,13 +282,6 @@ If Method is <ins>__DELETE__ </ins>:
 
 <ins> Purpose </ins>:
 
-__PUT__:
-* Given the `ID` of an existing question belonging to an event, this allows the owner of 
-the event to change the description of the question.
-Parameter available to be changed/overwritten, as listed above, are:
-    * `description`
-
-__DELETE__:
 * Given the `ID(s)` of existing question(s), this allows the owner of an event to delete 
 the question(s) corresponding to the `ID(s)`, along with all given feedback 
 associated with the question(s).
