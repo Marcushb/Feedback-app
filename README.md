@@ -148,7 +148,10 @@ error will be returned.
 
 <ins> Returns: </ins>
 
-* Nothing
+* Nothing (empty object)
+```
+{}
+```
 
 
 <ins> Purpose: </ins>
@@ -157,3 +160,124 @@ error will be returned.
 will be added to the event, while it remains active. This pin can be used by other
 non-logged-in users, to give feedback on the questions asked by the creator of the event.
 See [submit_feedback](Placeholder) ##FUNCTIONALITY YET TO BE IMPLEMENTED.
+
+---
+<br/>
+
+### **Modify or delete an event**
+<br/>
+
+<ins> General information </ins>
+
+>* Route: `/modify_event`
+>* Methods: `PUT, DELETE`
+
+<br/>
+
+If Method is <ins>__PUT__ </ins>:
+
+<ins> Parameters </ins>:
+
+>* x-access-token `{string}` `[header]` `(required)`
+>* ID `{string}` `[body]` `(required)`
+>* title `{string}` `[body]`
+>* startDate `{string}` `[body]`
+>* endDate `{string}` `[body]`
+>* description `{string}` `[body]`
+
+<ins> Returns </ins>:
+
+>* Nothing (empty object)
+```
+{}
+```
+
+<br/>
+
+If Method is <ins>__DELETE__ </ins>:
+
+<ins> Parameters </ins>:
+
+>* x-access-token `{string}` `[header]` `(required)`
+>* ID `{list of strings}` `[body]` `(required)`
+
+<ins> Returns </ins>:
+
+>* Nothing (empty object)
+```
+{}
+```
+
+<ins> Purpose </ins>:
+
+__PUT__:
+* Given the `ID` of an existing event, this allows the owner of the event to change the 
+contents of said event.
+Parameters available to be changed/overwritten, as listed above, are:
+    * `title`
+    * `startDate`
+    * `endDate`
+    * `description`
+
+__DELETE__:
+* Given the `ID(s)` of an existing event, this allows the owner of an event to delete the
+event(s) corresponding to the `ID(s)`, along with every question and given feedback 
+associated with the event(s).
+
+
+---
+<br/>
+
+### **Modify or delete a question**
+<br/>
+
+<ins> General information </ins>
+
+>* Route: `/modify_question`
+>* Methods: `PUT, DELETE`
+
+<br/>
+
+If Method is <ins>__PUT__ </ins>:
+
+<ins> Parameters </ins>:
+
+>* x-access-token `{string}` `[header]` `(required)`
+>* ID `{string}` `[body]` `(required)`
+>* description `{string}` `[body]`
+
+<ins> Returns </ins>:
+
+>* Nothing (empty object)
+```
+{}
+```
+
+<br/>
+
+If Method is <ins>__DELETE__ </ins>:
+
+<ins> Parameters </ins>:
+
+>* x-access-token `{string}` `[header]` `(required)`
+>* ID `{list of strings}` `[body]` `(required)`
+
+<ins> Returns </ins>:
+
+>* Nothing (empty object)
+```
+{}
+```
+
+<ins> Purpose </ins>:
+
+__PUT__:
+* Given the `ID` of an existing question belonging to an event, this allows the owner of 
+the event to change the description of the question.
+Parameter available to be changed/overwritten, as listed above, are:
+    * `description`
+
+__DELETE__:
+* Given the `ID(s)` of existing question(s), this allows the owner of an event to delete 
+the question(s) corresponding to the `ID(s)`, along with all given feedback 
+associated with the question(s).

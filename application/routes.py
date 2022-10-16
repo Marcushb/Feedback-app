@@ -304,7 +304,7 @@ def modify_question(current_user):
     data = request.get_json(force = True)
 
     if request.method == 'PUT':
-        question = Event.query.filter_by(id = data['ID']).first()
+        question = Question.query.filter_by(id = data['ID']).first()
         question.description = data['description']
         db.session.commit()
 
