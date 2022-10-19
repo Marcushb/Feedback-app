@@ -286,6 +286,7 @@ If Method is <ins>__DELETE__ </ins>:
 the question(s) corresponding to the `ID(s)`, along with all given feedback 
 associated with the question(s).
 
+---
 
 
 ### **Get events**
