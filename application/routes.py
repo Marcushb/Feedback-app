@@ -1,6 +1,6 @@
 import json
 from queue import Empty
-from application.models import User, Event, Question, Feedback, VerifyInput
+from application.models import User, Event, Question, Feedback, Pin, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
 from application.functions import change_event, check_isActive_expired
@@ -246,9 +246,15 @@ def createEvent(current_user):
         data = request.get_json(force = True)
 
         public_id = str(uuid.uuid4())
+        pin_event = random.randint(0, 9999)
+        while Pin.query.filter_by(pin = pin_event).first() is not None:
+            pin_event = random.randint(0, 9999)
+        db.session.add(Pin(pin = pin_event))
+        db.session.commit()
+
         event = Event(
             public_id = public_id,
-            pin = random.randint(0, 9999),
+            pin = pin_event,
             title = data['title'],
             date_start = data['startDate'],
             date_end = data['endDate'],
@@ -417,8 +423,7 @@ def get_events_new(current_user):
             event_data['rating3'] = feedback_rating.count(3)
             event_data['rating4'] = feedback_rating.count(4)
             event_data['isActive'] = check_isActive_expired(
-                event.isActive,
-                event.date_end,
+                event,
                 constant.expiration_min
                 )
 
@@ -439,8 +444,7 @@ def get_events(current_user, id):
         event_data['endDate'] = event.date_end
         event_data['description'] = event.description
         event_data['isActive'] = check_isActive_expired(
-            event.isActive,
-            event.date_end,
+            event,
             constant.expiration_min
         )
 
@@ -477,7 +481,7 @@ def initialize_session(pin):
                 event.date_end,
                 constant.expiration_min
                 )
-            if event_data['isActive'] == False:
+            if not event_data['isActive']:
                 return jsonify({
                     'errorMessage': f'Pin {pin} is not valid',
                     'route': f'{request.url}',
@@ -526,5 +530,10 @@ def give_feedback():
 
 @application.route("/test", methods = ["POST"])
 def test():
-    return "blabla", 401
+    event = Event.query.filter_by(created_by_user = 1).first()
+    test = check_isActive_expired(
+        event,
+        constant.expiration_min
+        )
+    return f"{test}", 200
 

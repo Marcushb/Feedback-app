@@ -88,7 +88,8 @@ class Feedback(db.Model):
     def __repr__(self):
         return f"Answer('{self.content}')"
 
-
+class Pin(db.Model):
+    pin = db.Column(db.Integer, primary_key = True)
 
 class VerifyInput:
     def check_keys(check_type, keys_expected, data = None):
