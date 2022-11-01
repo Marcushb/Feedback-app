@@ -1,5 +1,5 @@
-from application.models import Event, Pin
-from flask import request
+from application.models import User, Event, Pin
+from flask import request, jsonify
 from application.constant import db_overwrite_params
 from application import db
 from datetime import datetime, timedelta
@@ -48,4 +48,4 @@ def check_isActive_expired(event, time_delta):
         db.session.commit()
         return False
     else:
-        return True
+        return True    

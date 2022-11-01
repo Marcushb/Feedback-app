@@ -89,8 +89,8 @@ def database():
 #             ]
 #         )
 
-@application.route("/login_microsoft", methods=['POST'])
-def login():
+@application.route("/login_microsoft", methods = ['POST'])
+def login_microsoft():
     if request.method == 'POST':
         # input_check = VerifyInput.check_keys(
         #     keys_expected = ['accessToken'], 
@@ -107,7 +107,8 @@ def login():
 
         if 'error' in verified.json().keys():
             return jsonify({
-                'message': verified.json()['error']['code'],
+                'errorMessage': verified.json()['error']['code'],
+                'route': f'{request.url}',
                 'statusCode': verified.status_code
             }), verified.status_code
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
@@ -161,12 +162,70 @@ def login():
     #     else:
     #         return 'Get smashed'
 
+@application.route("/register_app", methods = ["POST"])
+def register_app():
+    ## IMPLEMENTÉR KRAV TIL EMAIL - HER ELLER FRONTEND?
+    if request.method == 'POST':
+        data = request.get_json(force = True)
+        exists = User.query.filter_by(email = data['email']).first()
+        if exists:
+            return jsonify({
+                'errorMessage': 'Email already exists',
+                'route': f'{request.url}',
+                'statusCode': 400
+            }), 400
+        
+        jwt_token = jwt.encode(
+            {
+                'email': data['email'],
+                'name': data['name']
+            },
+                key = application.config['SECRET_KEY'],
+                algorithm = "HS256"
+        )
+        new_user = User(
+            name = data['name'],
+            email = data['email'],
+            jwt_token = jwt_token,
+            unhashed_password = data['password']
+            )
+        db.session.add(new_user)
+        db.session.commit()
+        user = User.query.filter_by(email = new_user.email).first()
+        if user.name == "":
+            user.name = None
+        return jsonify({
+                'jwtToken': user.jwt_token,
+                'email': user.email,
+                'name': user.name
+                }), 200
+
+
 
 # @application.route("/logout", methods=["GET", "POST"])
 # def logout():
 #     if request.method == 'POST':
 #         logout_user()
 
+@application.route("/login_app", methods = ["POST"])
+def login_app():
+     if request.method == 'POST':
+        data = request.get_json(force = True)
+        user = User.query.filter_by(email = data['email']).first()
+        if user and bcrypt.check_password_hash(user.password, data['password']):
+            return jsonify({
+                'jwtToken': user.jwt_token,
+                'email': user.email,
+                'name': user.name
+                }), 200
+        else:
+            return jsonify({
+                'errorMessage': 'Incorrect email or password',
+                'route': f'{request.url}',
+                'statusCode': 401
+                }), 401
+                
+        
 
 
 @application.route("/get_microsoft_events", methods = ["POST"])

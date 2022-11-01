@@ -1,7 +1,7 @@
 from unicodedata import numeric
 from flask import jsonify, request
 from sqlalchemy import null
-from application import db, login_manager
+from application import db, login_manager, bcrypt
 from datetime import datetime
 from dateutil.tz import tzutc
 from flask_login import UserMixin
@@ -19,6 +19,7 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(20), unique = False, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
     jwt_token = db.Column(db.String(200), unique = True, nullable = False)
+    password = db.Column(db.String(100), unique = True, nullable = True)
     user_events = db.relationship(
         'Event',
         foreign_keys='Event.created_by_user',
@@ -32,13 +33,14 @@ class User(db.Model, UserMixin):
         lazy=True
     )
 
-    # @property
-    # def unhashed_password(self):
-    #     raise AttributeError('Cannot view unhashed password')
+    @property
+    def unhashed_password(self):
+        # Nok ikke så smart selv at raise Error så API'en fejler - undersøg
+        raise AttributeError('Cannot view unhashed password')
 
-    # @unhashed_password.setter
-    # def unhashed_password(self, unhashed_password):
-    #     self.password = bcrypt.generate_password_hash(unhashed_password)
+    @unhashed_password.setter
+    def unhashed_password(self, unhashed_password):
+        self.password = bcrypt.generate_password_hash(unhashed_password)
 
     def __repr__(self):
         return f"User('{self.name}\n','{self.email}"
