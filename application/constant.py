@@ -12,3 +12,7 @@ urls = {
         'get_user_events': 'https://graph.microsoft.com/v1.0/me/events'
     }
 }
+
+datetime_format = ""
+
+expiration_min = 1e5

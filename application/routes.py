@@ -1,16 +1,16 @@
 import json
-from application.models import User, Event, Question, Feedback, VerifyInput
+from queue import Empty
+from application.models import User, Event, Question, Feedback, Pin, VerifyInput
 from application import application, db, constant, bcrypt
-from flask import request, jsonify, make_response
-from application.functions import change_event
+from flask import request, jsonify, make_response, json
+from application.functions import change_event, check_isActive_expired
 import requests
 import uuid
 import jwt
-import datetime
 from functools import wraps
 import random
-from datetime import datetime
-import dateutil.parser
+from datetime import datetime, timedelta
+from dateutil import parser
 # random.seed(42)
 db.create_all()
 
@@ -24,7 +24,8 @@ def token_required(f):
 
         if not jwt_token:
             return jsonify({
-                'message': 'Token is missing',
+                'errorMessage': 'Token is missing',
+                'route': f'{request.url}',
                 'statusCode': 401
                 }), 401
 
@@ -35,7 +36,8 @@ def token_required(f):
             current_user = User.query.filter_by(email = data['email']).first()
         except:
             return jsonify({
-                'message': 'Token does not match',
+                'errorMessage': 'Token does not match',
+                'route': f'{request.url}',
                 'statusCode': 401})
 
         return f(current_user, *args, **kwargs)
@@ -50,8 +52,9 @@ def home():
         # user.name = "changed_name"
         
         # db.session.commit()
+        data = request.get_json(force = True)
+        return 'Yes'
 
-        return 'Hello'
 @application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
@@ -86,8 +89,8 @@ def database():
 #             ]
 #         )
 
-@application.route("/login_microsoft", methods=['POST'])
-def login():
+@application.route("/login_microsoft", methods = ['POST'])
+def login_microsoft():
     if request.method == 'POST':
         # input_check = VerifyInput.check_keys(
         #     keys_expected = ['accessToken'], 
@@ -95,7 +98,7 @@ def login():
         #     )
         # if input_check['result'] == 'error':
         #     return jsonify(input_check)
-        input_check = request.get_json('accessToken')
+        input_check = request.get_json(force = True)
         header = {"Authorization": f"Bearer {input_check['accessToken']}"}
         verified = requests.get(
             url = constant.urls['microsoft']['verify_identity'], 
@@ -104,7 +107,8 @@ def login():
 
         if 'error' in verified.json().keys():
             return jsonify({
-                'message': verified.json()['error']['code'],
+                'errorMessage': verified.json()['error']['code'],
+                'route': f'{request.url}',
                 'statusCode': verified.status_code
             }), verified.status_code
                 # undersøg mulighed for at implementre forskellige messages alt efter error, 
@@ -112,16 +116,7 @@ def login():
                 # har virket etc
         else:
             verified = verified.json()
-        """"
-        data = VerifyInput.check_keys(
-            check_type = 'object', 
-            keys_expected = ['userPrincipalName', 'displayName'],
-            data = verified
-            )
-        if data['result'] == 'error':
-            return jsonify(data)
-        """
-        # data = request.get_json('userPrincipalName, displayName')
+   
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
         user = User.query.filter_by(email = user_email).first()
         if not user:
@@ -167,14 +162,70 @@ def login():
     #     else:
     #         return 'Get smashed'
 
+@application.route("/register_app", methods = ["POST"])
+def register_app():
+    ## IMPLEMENTÉR KRAV TIL EMAIL - HER ELLER FRONTEND?
+    if request.method == 'POST':
+        data = request.get_json(force = True)
+        exists = User.query.filter_by(email = data['email']).first()
+        if exists:
+            return jsonify({
+                'errorMessage': 'Email already exists',
+                'route': f'{request.url}',
+                'statusCode': 400
+            }), 400
+        
+        jwt_token = jwt.encode(
+            {
+                'email': data['email'],
+                'name': data['name']
+            },
+                key = application.config['SECRET_KEY'],
+                algorithm = "HS256"
+        )
+        new_user = User(
+            name = data['name'],
+            email = data['email'],
+            jwt_token = jwt_token,
+            unhashed_password = data['password']
+            )
+        db.session.add(new_user)
+        db.session.commit()
+        user = User.query.filter_by(email = new_user.email).first()
+        if user.name == "":
+            user.name = None
+        return jsonify({
+                'jwtToken': user.jwt_token,
+                'email': user.email,
+                'name': user.name
+                }), 200
+
+
 
 # @application.route("/logout", methods=["GET", "POST"])
 # def logout():
 #     if request.method == 'POST':
 #         logout_user()
 
-
-
+@application.route("/login_app", methods = ["POST"])
+def login_app():
+     if request.method == 'POST':
+        data = request.get_json(force = True)
+        user = User.query.filter_by(email = data['email']).first()
+        if user and bcrypt.check_password_hash(user.password, data['password']):
+            return jsonify({
+                'jwtToken': user.jwt_token,
+                'email': user.email,
+                'name': user.name
+                }), 200
+        else:
+            return jsonify({
+                'errorMessage': 'Incorrect email or password',
+                'route': f'{request.url}',
+                'statusCode': 401
+                }), 401
+                
+                
 @application.route("/get_microsoft_events", methods = ["POST"])
 @token_required
 def get_outlook_events(current_user):
@@ -183,7 +234,7 @@ def get_outlook_events(current_user):
         # data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
         # if data['result'] == 'error':
         #     return jsonify(data)
-        data = request.get_json('accessToken')
+        data = request.get_json(force = True)
         header = {"Authorization": f"Bearer {data['accessToken']}"}
         params = {
             'select': 'id, subject, bodyPreview, start, end, attendees, location'
@@ -223,8 +274,8 @@ def get_outlook_events(current_user):
             output_data['id'] = meeting['id']
             output_data['subject'] = meeting['subject']
             output_data['bodyPreview'] = meeting['bodyPreview']
-            output_data['startTime'] = dateutil.parser.isoparse(meeting['start']['dateTime']).isoformat() + "Z"
-            output_data['endTime'] = dateutil.parser.isoparse(meeting['end']['dateTime']).isoformat() + "Z"
+            output_data['startTime'] = parser.isoparse(meeting['start']['dateTime']).isoformat() + "Z"
+            output_data['endTime'] = parser.isoparse(meeting['end']['dateTime']).isoformat() + "Z"
             output_data['location'] = meeting['location']['displayName']
 
             attendees = []
@@ -244,144 +295,137 @@ def get_outlook_events(current_user):
         }), 401
 
 
-@application.route("/create_event", methods = ['POST', 'PUT'])
+@application.route("/create_event", methods = ['POST'])
 @token_required
 def createEvent(current_user):
     if request.method == 'POST':
         user = User.query.filter_by(email = current_user.email).first()
-        data = VerifyInput.check_keys(
-            check_type = 'request', 
-            keys_expected = ['title', 'date_start', 'date_end', 'description']
-            )
-        if data['result'] == 'error':
-            return jsonify(data)
+        data = request.get_json(force = True)
+
+        public_id = str(uuid.uuid4())
+        pin_event = random.randint(0, 9999)
+        while Pin.query.filter_by(pin = pin_event).first() is not None:
+            pin_event = random.randint(0, 9999)
+        db.session.add(Pin(pin = pin_event))
+        db.session.commit()
+
         event = Event(
-            event_pin = random.randint(0, 9999),
+            public_id = public_id,
+            pin = pin_event,
             title = data['title'],
-            # date_start = request.form['date_start'],
-            # date_end = datetime request.form['date_end'],
+            date_start = data['startDate'],
+            date_end = data['endDate'],
             description = data['description'],
             created_by_user = user.id
         )
         db.session.add(event)
 
-        questions = request.get_json('question')
-        # FIND LØSNING PÅ LOOP OVER QUESTIONS 
-        # if isinstance(questions, str):
-        #     question_db = Question(
-        #         question = question,
-        #         asked_by_user = user.id,
-        #         parent_event = event.id
-        #     )
-        #     db.session.add(question_db)
+        questions = data['questions']
+        event = Event.query.filter_by(public_id = public_id).first()
 
-        # elif isinstance(questions, list):
-        # FORVENT ALTID LISTE, TJEK DET ER SANDT
-        if isinstance(question, list):
-            for question in questions:
-                question_db = Question(
-                    question = question,
-                    asked_by_user = user.id,
-                    parent_event = event.id
-                )
-                db.session.add(question_db)
+        for question in questions:
+            question_db = Question(
+                description = question,
+                asked_by_user = user.id,
+                parent_event = event.id
+            )
+            db.session.add(question_db)
 
         db.session.commit()
 
-        return jsonify({
-                'title': f'{event.title}',
-                'description': f'{event.description}',
-                'creatorName': f'{event.user_events.name}',
-                'creatorEmail': f'{event.user_events.email}',
-                'eventPublic_id': f'{event.app_id}',
-                'statusCode': 200
-                }), 200
+        return {}, 200
+
+
+@application.route("/modify_event", methods = ['PUT', 'DELETE'])
+@token_required
+def modify_event(current_user):
+    data = request.get_json(force = True)
 
     if request.method == 'PUT':
-        """
-        data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['appId'])
-        if data['result'] == 'error':
-            return data
-        event = Event.query.filter_by(app_id = data['appId']).first()
+        event = Event.query.filter_by(id = data['ID']).first()
+        event.title = data['title']
+        event.date_start = data['startDate']
+        event.date_end = data['endDate']
+        event.description = data['description']
+        db.session.commit()
+
+        return {}, 200
     
-        # Lav funktion der verificerer at de sendte parametre er parametre der kan ændres.
-        # F.eks for Event skal den tjekke, at keys i de sendte parametre i request.form[]
-        # er i listen ['title', 'date_start', 'date_end', 'description'] 
-        
-        keys_accepted = VerifyInput.check_overwrite_keys(
-            keys_overwrite = [request.get_json('keys_overwrite')], 
-            keys_accepted = constant.db_overwrite_params['Event']
-            )
-        if keys_accepted:
-            return jsonify(keys_accepted)
-        else:
-            return 'keys overwrite accepted'
-        """
-        event = Event.query.filter_by(app_id = request.get_json('app_id'))
-        ow_params = constant.db_overwrite_params['Event']
-        # vals = [request.get_json(f'{var}') for var in ow_params]
-        vals = request.get_json('title')
-        print(vals)
-        return 'word'
-        # event_title = vals[ow_params == 'title']
-        # event_date_start = vals[ow_params == 'date_start']
-        # event_date_end = vals[ow_params == 'date_start']
-        # event_description = vals[ow_params == 'description']
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            event = Event.query.filter_by(id = id).first()
+            questions = Question.query.filter_by(parent_event = id).delete()
+            feedbacks = Feedback.query.filter_by(parent_event = id).delete()
+            event = Event.query.filter_by(id = id).delete()
+        db.session.commit()
 
-        # for var in ow_params:
-        #     var_change = "_".join(["event", var])
-        #     if f'{var_change}' == None:
-        #         continue
-        #     match var_change:
-        #         case 'title':
-        #             event.title = event_title
-        #         case 'date_start':
-        #             event.date_start = event_date_start
-        #         case 'date_end':
-        #             event.date_end = event_date_end
-        #         case 'description':
-        #             event.description = event_description
-        # db.session.commit()
-        # return jsonify({'statusCode': 200}), 200
+        return {}, 200
 
-
-@application.route("/question/<app_id>", methods=['POST', 'GET'])
+@application.route("/modify_question", methods = ['PUT', 'DELETE'])
 @token_required
-def ask_question(current_user, app_id):
-    if request.method == 'POST':
+def modify_question(current_user):
+    data = request.get_json(force = True)
+
+    if request.method == 'PUT':
+        question = Question.query.filter_by(id = data['ID']).first()
+        question.description = data['description']
+        db.session.commit()
+
+        return {}, 200
+    
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            question = Question.query.filter_by(id = id).first()
+            feedbacks = Feedback.query.filter_by(parent_question = id).delete()
+            question = Question.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
+
+@application.route("/modify_feedback", methods = ['PUT', 'DELETE'])
+@token_required
+def modify_feedback(current_user):
+    data = request.get_json(force = True)
+
+    if request.method == 'PUT':
+        feedback = Feedback.query.filter_by(id = data['ID']).first()
+        feedback.rating = data['rating']
+        feedback.content = data['content']
+        db.session.commit()
+
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            feedback = Feedback.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
+    
+    if request.method == 'DELETE':
+        for id in data['ID']:
+            question = Question.query.filter_by(id = id).first()
+            feedbacks = Feedback.query.filter_by(parent_question = id).delete()
+            question = Question.query.filter_by(id = id).delete()
+        db.session.commit()
+
+        return {}, 200
+
+# @application.route("/question/<app_id>", methods=['POST', 'GET'])
+# @token_required
+# def ask_question(current_user, app_id):
+#     if request.method == 'POST':
         
-        user = User.query.filter_by(public_id = current_user.public_id).first()
-        event = Event.query.filter_by(app_id = app_id).first()
+#         user = User.query.filter_by(public_id = current_user.public_id).first()
+#         event = Event.query.filter_by(app_id = app_id).first()
 
-        question = Question(
-            question = request.get_json('question'),
-            asked_by_user = user.id,
-            parent_event = event.id
-        )
-        db.session.add(question)
-        db.session.commit()
+#         question = Question(
+#             question = request.get_json('question'),
+#             asked_by_user = user.id,
+#             parent_event = event.id
+#         )
+#         db.session.add(question)
+#         db.session.commit()
 
-        return question.question, 200
-
-"""
-Fiks kald
-"""
-@application.route("/submit_feedback", methods = ['POST'])
-def give_feedback(question_id):
-    if request.method == 'POST':
-        question_ids = request.get_json('question')
-        parent_question = Question.query.filter_by(id = int(question_id)).first()
-        parent_user = User.query.filter_by(id = parent_question.asked_by_user).first()
-
-        feedback = Feedback(
-            content = request.get_json('content'),
-            answered_by_id = parent_user.id,
-            parent_question = parent_question.id
-        )
-        db.session.add(feedback)
-        db.session.commit()
-
-        return feedback.content
+#         return question.question, 200
 
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
@@ -394,7 +438,7 @@ def get_all_users():
         user_data['email'] = user.email
         output.append(user_data)
 
-    return jsonify({'users': output})
+    return jsonify({'users': output}), 200
 
 @application.route("/get_one_user/<public_id>", methods=['GET'])
 def get_one_user(public_id):
@@ -408,68 +452,145 @@ def get_one_user(public_id):
     user_data['name'] = user.name
     user_data['email'] = user.email
 
-    return jsonify({'user': user_data})
+    return jsonify({'user': user_data}), 200
 
 
-@application.route("/get_events", methods = ['POST'])
-def get_events():
-    if request.method == 'POST':
-        user = User.query.filter_by(id = request.get_json('id')['id']).first()
+@application.route("/events", methods = ['GET'])
+@token_required
+def get_events_new(current_user):
+    if request.method == 'GET':
+        user = User.query.filter_by(email = current_user.email).first()
         events_db = Event.query.filter_by(created_by_user = user.id).all()
-
+        if len(events_db) == 0:
+            return jsonify({"response": []}), 200
         events = []
         for event in events_db:
             event_data = {}
+            feedback_data = Feedback.query.filter_by(parent_event = event.id).all()
+            feedback_rating = []
+            for feedback in feedback_data:
+                feedback_rating.append(feedback.rating)
+            event_data['id'] = event.id
+            event_data['title'] = event.title
+            event_data['startDate'] = event.date_start
+            event_data['endDate'] = event.date_end
+            event_data['feedbackCount'] = len(feedback_rating)
+            event_data['rating1'] = feedback_rating.count(1)
+            event_data['rating2'] = feedback_rating.count(2)
+            event_data['rating3'] = feedback_rating.count(3)
+            event_data['rating4'] = feedback_rating.count(4)
+            event_data['isActive'] = check_isActive_expired(
+                event,
+                constant.expiration_min
+                )
+
+            events.append(event_data)
+
+        return jsonify({"response": events}), 200
+
+
+@application.route("/events/<id>", methods = ['GET'])
+@token_required
+def get_events(current_user, id):
+    if request.method == 'GET':
+        
+        event = Event.query.filter_by(id = id).first()
+        event_data = {}
+        event_data['title'] = event.title
+        event_data['startDate'] = event.date_start
+        event_data['endDate'] = event.date_end
+        event_data['description'] = event.description
+        event_data['isActive'] = check_isActive_expired(
+            event,
+            constant.expiration_min
+        )
+
+        questions_db = Question.query.filter_by(parent_event = event.id).all()
+        questions = []
+        for question in questions_db:
+            question_data = {}
+            question_data['question'] = question.description
+
+            feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
+            feedbacks = []
+            for feedback in feedbacks_db:
+                feedback_data = {}
+                feedback_data['rating'] = feedback.rating
+                feedback_data['content'] = feedback.content
+                feedbacks.append(feedback_data)
+
+            question_data['feedbacks'] = feedbacks
+            questions.append(question_data)
+            
+        event_data['questions'] = questions
+
+        return jsonify({'response': event_data}), 200
+
+
+@application.route("/initialize_session/<pin>", methods = ["POST"])
+def initialize_session(pin):
+    if request.method == 'POST':
+        event = Event.query.filter_by(pin = pin).first()
+        if event:
+            event_data = {}
+            event_data['isActive'] = check_isActive_expired(
+                event.isActive,
+                event.date_end,
+                constant.expiration_min
+                )
+            if not event_data['isActive']:
+                return jsonify({
+                    'errorMessage': f'Pin {pin} is not valid',
+                    'route': f'{request.url}',
+                    'statusCode': 410
+                    }), 410
             event_data['title'] = event.title
             event_data['date_posted'] = event.date_posted
             event_data['description'] = event.description
-            event_data['isActive'] = event.isActive
-            event_data['']
 
             questions_db = Question.query.filter_by(parent_event = event.id).all()
             questions = []
             for question in questions_db:
                 question_data = {}
-                question_data['question'] = question.question
-                question_data['date_posted'] = question.date_posted
-
-                feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
-                feedbacks = []
-                for feedback in feedbacks_db:
-                    feedback_data = {}
-                    feedback_data['content'] = feedback.content
-                    feedback_data['date_posted'] = feedback.date_posted
-                    feedbacks.append(feedback_data)
-
-                question_data['feedbacks'] = feedbacks
+                question_data['question'] = question.description
                 questions.append(question_data)
-
             event_data['questions'] = questions
 
-            events.append(event_data)
+            return jsonify({'response': event_data}), 200
+        else:
+            return jsonify({
+                'errorMessage': f'Pin {pin} is not valid',
+                'route': f'{request.url}',
+                'statusCode': 404
+                }), 404
 
-        return jsonify({'email': user.email, 'events': events})
 
+@application.route("/submit_feedback", methods = ['POST'])
+def give_feedback():
+    if request.method == 'POST':
+        data = request.get_json(force = True)
+        parent_question = Question.query.filter_by(id = data['questionID']).first()
+        parent_user_id = parent_question.asked_by_user
 
-@application.route("/get_event/<event_pin>", methods = ['GET'])
-def get_event(event_pin):
-    if request.method == 'GET':
-        event = Event.query.filter_by(app_id = event_pin).all()
-        questions_db = Question.query.filter_by(parent_event = event.id).all()
-        questions = []
-        for question in questions_db:
-            question_data = {}
-            question_data['question'] = question.question
-        
-        event_object = {
-            'event_title': event.title,
-            'event_descrption': event.description,
-            'questions': questions
-        }
-        return event_object, 200
+        feedback = Feedback(
+            rating = data['rating'],
+            content = data['content'],
+            answered_by_id = parent_user_id,
+            parent_question = parent_question.id,
+            parent_event = parent_question.parent_event
+        )
+        db.session.add(feedback)
+        db.session.commit()
+
+        return {}, 200
 
 
 @application.route("/test", methods = ["POST"])
 def test():
-    return "blabla", 401
+    event = Event.query.filter_by(created_by_user = 1).first()
+    test = check_isActive_expired(
+        event,
+        constant.expiration_min
+        )
+    return f"{test}", 200
 
