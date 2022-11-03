@@ -225,9 +225,7 @@ def login_app():
                 'statusCode': 401
                 }), 401
                 
-        
-
-
+                
 @application.route("/get_microsoft_events", methods = ["POST"])
 @token_required
 def get_outlook_events(current_user):
