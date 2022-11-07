@@ -44,17 +44,14 @@ def token_required(f):
 
     return decorated
 
-@application.route("/", methods=['POST'])
+@application.route("/", methods=['GET', 'POST'])
 def home():
+    if request.method == 'GET':
+        return 'App is alive'
+
     if request.method == 'POST':
-
-        # user = User.query.filter_by(email = "test_email@live.dk").first()
-        # user.name = "changed_name"
-        
-        # db.session.commit()
-        data = request.get_json(force = True)
-        return 'Yes'
-
+        return 'App is alive'
+    
 @application.route("/database", methods=['POST', 'GET'])
 def database():
     user = User.query.filter_by(email='user1@live.dk').first()
