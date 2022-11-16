@@ -1,5 +1,49 @@
 # Backend of the feedback application
 
+## Guide for deploying app locally in docker.
+### Prerequisites
+Windows:
+- install docker desktop
+  - preferably setup docker desktop with wsl2 (also install wsl2)
+- Install docker-compose
+
+Linux:
+- install docker
+- install docker-compose
+
+### How to use docker
+In order to deploy the app as a container in docker
+1) build image
+    - From Feedback-app folder, run: 
+      - `docker build -t feedback-app .`
+2) run image (can be done in docker, but prefereably done in docker-compose) 
+    - `docker run -p 5050:5000 feedback-app`
+
+Useful commands:
+- List existing images, running and stopped:
+  - `docker ps -a`
+- clean up images
+  - `docker rmi <image-id>` 
+
+- stop running container
+  - `docker stop <container-id>`
+- remove container
+  - `docker rm <container-id>`
+
+### How to use docker-compose
+Deploying feedback-app using docker-compose
+1) build image (see step 1 above)
+2) run docker-compose
+    - from Feedback-app folder, run: `docker-compose up`
+
+In order to shut down app again, run: `docker-compose down`
+
+### Accessing deployed app
+Locally deployed app can be found on: `localhost:5050` 
+___
+
+# App Documentation
+
 ## Documentation for calls
 
 ---
