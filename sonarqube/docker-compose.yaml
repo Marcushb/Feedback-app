@@ -1,0 +1,36 @@
+version: "3"
+services:
+
+  SonarQube:
+    image: sonarqube:community
+    depends_on:
+      - db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/
+      SONAR_JDBC_USERNAME: sonartest
+      SONAR_JDBC_PASSWORD: sonartest
+    volumes:
+      - SonarQube_data:/opt/SonarQube/data
+      - SonarQube_extensions:/opt/SonarQube/extensions
+      - SonarQube_logs:/opt/SonarQube/logs
+    ports:
+      - "9000:9000"
+
+  db:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: sonartest
+      POSTGRES_PASSWORD: sonartest
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+
+volumes:
+  SonarQube_data:
+  SonarQube_extensions:
+  SonarQube_logs:
+  postgresql:
+  postgresql_data:
+
+
+# docker run --rm -e SONAR_HOST_URL="http://localhost:9000" -e SONAR_SCANNER_OPTS="-Dsonar.projectKey=test" -e SONAR_LOGIN="sqp_4fb6497b336afa223b592f82226318f8f89a5223" -v "/mnt/c/Users/jense/Desktop/projects/Feedback-app:/usr/src" sonarsource/sonar-scanner-cli
