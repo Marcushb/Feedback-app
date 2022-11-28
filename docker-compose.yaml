@@ -8,6 +8,8 @@ services:
     ports:
       - "5050:5000"
     restart: "no"
+    depends_on:
+      - postgresql-db
     entrypoint: [ "python", "/app/application.py" ]
 
   postgresql-db:
