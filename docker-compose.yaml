@@ -1,8 +1,38 @@
 version: '3.8'
 
 services:
+
   test-app:
+    image: feedback-app:latest
+    build: .
     ports:
       - "5050:5000"
-    image: feedback-app:latest
     restart: "no"
+    depends_on:
+      - postgresql-db
+    entrypoint: [ "python", "/app/application.py" ]
+
+  postgresql-db:
+    image: postgres:13.9
+    environment:
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=secret
+      - PGADMIN_LISTEN_PORT=80
+    ports:
+      - "82:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+volumes:
+  db-data:
+  pgadmin-data:
+      

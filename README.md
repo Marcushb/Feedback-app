@@ -11,6 +11,35 @@ Linux:
 - install docker
 - install docker-compose
 
+### How to use docker-compose
+Deploying feedback-app using docker-compose
+1) build image
+    - from Feedback-app folder, run: `docker-compose build`
+2) run docker-compose
+    - from Feedback-app folder, run: `docker-compose up`
+
+In order to shut down app again, run: `docker-compose down`
+
+### Accessing deployed app
+Locally deployed app can be found on: `localhost:5050` 
+
+Locally deployed db can be found on:
+`localhost: 5432`
+
+Locally deployed pgadmin app can be found on:
+`localhost: 82`
+login:
+- username: see docker-compose variable `PGADMIN_DEFAULT_EMAIL`
+- password: see docker-compose variable `PGADMIN_DEFAULT_PASSWORD`
+
+OBS: Internally, `localhost` should be exchanged for the name found in `docker-compose.yaml`.
+e.g. to access database from pgadmin, use hostname:
+`postgresql-db`
+
+### Accessing DB from pgadmin
+1) Log in to pgadmin using details from `docker-compose.yaml`
+2) Add server using hostname=`postgresql-db`, port=`5432`. Username and password is found in `docker-compose.yaml`
+
 ### How to use docker
 In order to deploy the app as a container in docker
 1) build image
@@ -24,22 +53,12 @@ Useful commands:
   - `docker ps -a`
 - clean up images
   - `docker rmi <image-id>` 
-
 - stop running container
   - `docker stop <container-id>`
 - remove container
   - `docker rm <container-id>`
 
-### How to use docker-compose
-Deploying feedback-app using docker-compose
-1) build image (see step 1 above)
-2) run docker-compose
-    - from Feedback-app folder, run: `docker-compose up`
 
-In order to shut down app again, run: `docker-compose down`
-
-### Accessing deployed app
-Locally deployed app can be found on: `localhost:5050` 
 ___
 
 # App Documentation
