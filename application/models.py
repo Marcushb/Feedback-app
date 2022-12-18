@@ -19,7 +19,7 @@ class User(db.Model, UserMixin):
     name = db.Column(db.String(20), unique = False, nullable = False)
     email = db.Column(db.String(120), unique = True, nullable = False)
     jwt_token = db.Column(db.String(200), unique = True, nullable = False)
-    password = db.Column(db.String(100), unique = True, nullable = True)
+    password = db.Column(db.String(200), unique = True, nullable = True)
     user_events = db.relationship(
         'Event',
         foreign_keys='Event.created_by_user',
@@ -55,7 +55,7 @@ class Event(db.Model):
     date_start = db.Column(db.String, nullable = False)
     date_end = db.Column(db.String, nullable = False)
     description = db.Column(db.Text, nullable = True)
-    isActive = db.Column(db.Integer, default = True)
+    isActive = db.Column(db.Boolean, default = True)
     event_questions = db.relationship(
         'Question',
         foreign_keys = 'Question.parent_event',
