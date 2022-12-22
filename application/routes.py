@@ -1,9 +1,9 @@
 import json
-from queue import Empty
 from application.models import User, Event, Question, Feedback, Pin, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
-from application.functions import change_event, check_isActive_expired
+import flask
+from application.functions import change_event, setIsActive, force_isActive, db_query_filter, json_response
 import requests
 import uuid
 import jwt
@@ -11,6 +11,7 @@ from functools import wraps
 import random
 from datetime import datetime, timedelta
 from dateutil import parser
+import pytest
 # random.seed(42)
 db.create_all()
 
@@ -104,7 +105,8 @@ def login_microsoft():
 
         if 'error' in verified.json().keys():
             return jsonify({
-                'errorMessage': verified.json()['error']['code'],
+                'errorMessage': 'Microsoft login unsuccesful',
+                'devInfo': verified.json()['error']['code'],
                 'route': f'{request.url}',
                 'statusCode': verified.status_code
             }), verified.status_code
@@ -167,7 +169,7 @@ def register_app():
         exists = User.query.filter_by(email = data['email']).first()
         if exists:
             return jsonify({
-                'errorMessage': 'Email already exists',
+                'errorMessage': 'Email already exists.',
                 'route': f'{request.url}',
                 'statusCode': 400
             }), 400
@@ -188,7 +190,8 @@ def register_app():
             )
         db.session.add(new_user)
         db.session.commit()
-        user = User.query.filter_by(email = new_user.email).first()
+        # user = User.query.filter_by(email = new_user.email).first()
+        user = db_query_filter("User", "email", new_user.email, "first", "user")
         if user.name == "":
             user.name = None
         return jsonify({
@@ -244,7 +247,9 @@ def get_outlook_events(current_user):
 
         if 'error' in verified.json().keys():
             return jsonify({
-                'message': f"{verified.json()['error']['code']}",
+                'errorMessage': 'Could not load Microsoft events.',
+                'devInfo': f"{verified.json()['error']['code']}",
+                "route": f"{request.url}",
                 'statusCode': f"{verified.status_code}"
             })
         else:
@@ -286,10 +291,6 @@ def get_outlook_events(current_user):
             output.append(output_data)
 
         return jsonify({'response': output}), 200
-    return jsonify({
-        'message': 'Request method must be POST',
-        'statusCode': 401
-        }), 401
 
 
 @application.route("/create_event", methods = ['POST'])
@@ -301,10 +302,10 @@ def createEvent(current_user):
 
         public_id = str(uuid.uuid4())
         pin_event = random.randint(0, 9999)
-        while Pin.query.filter_by(pin = pin_event).first() is not None:
+        while Event.query.filter_by(pin = pin_event).first() is not None:
             pin_event = random.randint(0, 9999)
-        db.session.add(Pin(pin = pin_event))
-        db.session.commit()
+        # db.session.add(Pin(pin = pin_event))
+        # db.session.commit()
 
         event = Event(
             public_id = public_id,
@@ -339,7 +340,10 @@ def modify_event(current_user):
     data = request.get_json(force = True)
 
     if request.method == 'PUT':
-        event = Event.query.filter_by(id = data['ID']).first()
+        event = db_query_filter("Event", "id", data['ID'], "first", "event")
+        # event = Event.query.filter_by(id = data['ID']).first()
+        # if not event:
+        #     return none_json("event")
         event.title = data['title']
         event.date_start = data['startDate']
         event.date_end = data['endDate']
@@ -350,7 +354,12 @@ def modify_event(current_user):
     
     if request.method == 'DELETE':
         for id in data['ID']:
-            event = Event.query.filter_by(id = id).first()
+            event = db_query_filter("Event", "id", id, "first", "event")
+            if isinstance(event, tuple):
+                return event
+            # event = Event.query.filter_by(id = id).first()
+            # if not event:
+            #     return none_json("event")
             questions = Question.query.filter_by(parent_event = id).delete()
             feedbacks = Feedback.query.filter_by(parent_event = id).delete()
             event = Event.query.filter_by(id = id).delete()
@@ -364,7 +373,10 @@ def modify_question(current_user):
     data = request.get_json(force = True)
 
     if request.method == 'PUT':
-        question = Question.query.filter_by(id = data['ID']).first()
+        question = db_query_filter("Question", "id", data['ID'], "first", "question")
+        if isinstance(question, tuple):
+                return question
+        # question = Question.query.filter_by(id = data['ID']).first()
         question.description = data['description']
         db.session.commit()
 
@@ -372,7 +384,10 @@ def modify_question(current_user):
     
     if request.method == 'DELETE':
         for id in data['ID']:
-            question = Question.query.filter_by(id = id).first()
+            question = db_query_filter("Question", "id", id, "first", "question")
+            if isinstance(question, tuple):
+                return question
+            # question = Question.query.filter_by(id = id).first()
             feedbacks = Feedback.query.filter_by(parent_question = id).delete()
             question = Question.query.filter_by(id = id).delete()
         db.session.commit()
@@ -471,15 +486,18 @@ def get_events_new(current_user):
             event_data['title'] = event.title
             event_data['startDate'] = event.date_start
             event_data['endDate'] = event.date_end
-            event_data['feedbackCount'] = len(feedback_rating)
-            event_data['rating1'] = feedback_rating.count(1)
-            event_data['rating2'] = feedback_rating.count(2)
-            event_data['rating3'] = feedback_rating.count(3)
-            event_data['rating4'] = feedback_rating.count(4)
-            event_data['isActive'] = check_isActive_expired(
-                event,
-                constant.expiration_min
-                )
+            event_data['isActive'] = setIsActive(event, constant.expiration_min)
+            
+            if len(feedback_rating) == 0:
+                event_data['feedbackSummary'] = None
+            else:
+                event_feedback = {}
+                event_feedback['rating1'] = feedback_rating.count(1)
+                event_feedback['rating2'] = feedback_rating.count(2)
+                event_feedback['rating3'] = feedback_rating.count(3)
+                event_feedback['rating4'] = feedback_rating.count(4)
+                event_feedback['feedbackCount'] = len(feedback_rating)
+                event_data['feedbackSummary'] = event_feedback
 
             events.append(event_data)
 
@@ -491,36 +509,81 @@ def get_events_new(current_user):
 def get_events(current_user, id):
     if request.method == 'GET':
         
-        event = Event.query.filter_by(id = id).first()
+        # event = Event.query.filter_by(id = id).first()
+        # if not event:
+        #     return none_json("event")
+        event = db_query_filter("Event", "id", id, "first", "event")
+        if isinstance(event, tuple):
+            return event
+
         event_data = {}
         event_data['title'] = event.title
         event_data['startDate'] = event.date_start
         event_data['endDate'] = event.date_end
         event_data['description'] = event.description
-        event_data['isActive'] = check_isActive_expired(
-            event,
-            constant.expiration_min
-        )
+        event_data['isActive'] = setIsActive(event, constant.expiration_min)
+        event_data['pin'] = event.pin
 
-        questions_db = Question.query.filter_by(parent_event = event.id).all()
+        questions_db = db_query_filter(
+            "Question",
+            "parent_event",
+            event.id,
+            "all",
+            "questions_db"
+        )
+        # questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
+        feedback_event_ratings = []
         for question in questions_db:
             question_data = {}
+            question_data['id'] = question.id
             question_data['question'] = question.description
 
+            feedback_question_ratings = []
             feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
-            feedbacks = []
-            for feedback in feedbacks_db:
-                feedback_data = {}
-                feedback_data['rating'] = feedback.rating
-                feedback_data['content'] = feedback.content
-                feedbacks.append(feedback_data)
+            if not feedbacks_db:
+                feedbacks = None
+            else: 
+                feedbacks = []
+                for feedback in feedbacks_db:
+                    feedback_data = {}
+                    feedback_data['rating'] = feedback.rating
+                    feedback_event_ratings.append(feedback.rating)
+                    feedback_question_ratings.append(feedback.rating)
+                    if not feedback.content:
+                        feedback_data['content'] = None
+                    else:
+                        feedback_data['content'] = feedback.content
+                    feedbacks.append(feedback_data)
 
             question_data['feedbacks'] = feedbacks
+
+            if len(feedback_question_ratings) == 0:
+                question_data['questionFeedbackSummary'] = None
+            else:
+                question_feedback_summary = {}
+                question_feedback_summary['rating1'] = feedback_question_ratings.count(1)
+                question_feedback_summary['rating2'] = feedback_question_ratings.count(2)
+                question_feedback_summary['rating3'] = feedback_question_ratings.count(3)
+                question_feedback_summary['rating4'] = feedback_question_ratings.count(4)
+                question_feedback_summary['feedbackCount'] = len(feedback_question_ratings)
+                question_data['questionFeedbackSummary'] = question_feedback_summary
+
             questions.append(question_data)
             
         event_data['questions'] = questions
 
+        # LAV TIL FUNKTION
+        if len(feedback_event_ratings) == 0:
+                event_data['feedbackSummary'] = None
+        else:
+            event_feedback = {}
+            event_feedback['rating1'] = feedback_event_ratings.count(1)
+            event_feedback['rating2'] = feedback_event_ratings.count(2)
+            event_feedback['rating3'] = feedback_event_ratings.count(3)
+            event_feedback['rating4'] = feedback_event_ratings.count(4)
+            event_feedback['feedbackCount'] = len(feedback_event_ratings)
+            event_data['feedbackSummary'] = event_feedback
         return jsonify({'response': event_data}), 200
 
 
@@ -530,64 +593,88 @@ def initialize_session(pin):
         event = Event.query.filter_by(pin = pin).first()
         if event:
             event_data = {}
-            event_data['isActive'] = check_isActive_expired(
-                event.isActive,
-                event.date_end,
-                constant.expiration_min
-                )
-            if not event_data['isActive']:
+            isActive = setIsActive(event, constant.expiration_min)
+            if isActive == 'FINISHED':
                 return jsonify({
                     'errorMessage': f'Pin {pin} is not valid',
                     'route': f'{request.url}',
                     'statusCode': 410
                     }), 410
+            user = db_query_filter("User", "id", event.created_by_user, "first", "user")
+            event_data['ownerName'] = user.name
+            event_data['ownerEmail'] = user.email
             event_data['title'] = event.title
-            event_data['date_posted'] = event.date_posted
+            event_data['datePosted'] = event.date_posted
             event_data['description'] = event.description
 
             questions_db = Question.query.filter_by(parent_event = event.id).all()
             questions = []
             for question in questions_db:
                 question_data = {}
-                question_data['question'] = question.description
+                question_data['description'] = question.description
+                question_data['id'] = question.id
                 questions.append(question_data)
             event_data['questions'] = questions
 
             return jsonify({'response': event_data}), 200
         else:
-            return jsonify({
-                'errorMessage': f'Pin {pin} is not valid',
-                'route': f'{request.url}',
-                'statusCode': 404
-                }), 404
+            # return jsonify({
+            #     'errorMessage': f'Pin {pin} is not valid',
+            #     'route': request.url,
+            #     'statusCode': 404
+            #     }), 404
+            return json_response(
+                f"Pin {pin} is not valid", 
+                f"Event with Pin {pin} does not exist in database",
+                request.url,
+                404
+            ), 404
 
 
 @application.route("/submit_feedback", methods = ['POST'])
 def give_feedback():
     if request.method == 'POST':
         data = request.get_json(force = True)
-        parent_question = Question.query.filter_by(id = data['questionID']).first()
-        parent_user_id = parent_question.asked_by_user
 
-        feedback = Feedback(
-            rating = data['rating'],
-            content = data['content'],
-            answered_by_id = parent_user_id,
-            parent_question = parent_question.id,
-            parent_event = parent_question.parent_event
-        )
-        db.session.add(feedback)
+        for answer in data:
+            parent_question = db_query_filter(
+                "Question",
+                "id", 
+                answer['id'], 
+                "first", 
+                "parent_question"
+                )
+            if isinstance(parent_question, tuple):
+                return parent_question
+            # parent_question = Question.query.filter_by(id = answer['id']).first()
+            feedback = Feedback(
+                rating = answer['rating'],
+                content = answer['content'],
+                parent_question = parent_question.id,
+                parent_event = parent_question.parent_event
+            )
+            db.session.add(feedback)
         db.session.commit()
 
         return {}, 200
 
 
 @application.route("/test", methods = ["POST"])
-def test():
-    event = Event.query.filter_by(created_by_user = 1).first()
-    test = check_isActive_expired(
-        event,
-        constant.expiration_min
-        )
-    return f"{test}", 200
+def test() -> flask.Response:
+    # event = Event.query.filter_by(created_by_user = 1).first()
+    # test = setIsActive(
+    #     event,
+    #     constant.expiration_min
+    #     )
+    # data = jsonify({"bla": "bla"})
+    data = json_response(1, 1, 1)
+    return data
+
+@application.route("/force_event_active", methods = ["POST"])
+def force_event_active():
+    data = request.get_json(force = True)
+    event = Event.query.filter_by(id = data['ID']).first()
+    force_isActive(event)
+
+    return {}, 200
 

@@ -1,4 +1,5 @@
 from application import application
+from enum import Enum
 
 db_overwrite_params = {
     'Event': ['title', 'date_start', 'date_end', 'description'],
@@ -15,4 +16,12 @@ urls = {
 
 datetime_format = ""
 
-expiration_min = 1e5
+class status(Enum):
+    upcoming = 'UPCOMING',
+    active = 'ACTIVE'
+    finished = 'FINISHED'
+
+class errorMessages(Enum):
+    default_error = 'Something went wrong.'
+
+expiration_min = 1e5 #min

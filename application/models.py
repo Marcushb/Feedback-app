@@ -55,7 +55,7 @@ class Event(db.Model):
     date_start = db.Column(db.String, nullable = False)
     date_end = db.Column(db.String, nullable = False)
     description = db.Column(db.Text, nullable = True)
-    isActive = db.Column(db.Boolean, default = True)
+    isActive = db.Column(db.String, default = 'UPCOMING')
     event_questions = db.relationship(
         'Question',
         foreign_keys = 'Question.parent_event',
@@ -83,7 +83,6 @@ class Feedback(db.Model):
     date_posted = db.Column(db.DateTime, default=datetime.utcnow, nullable = False)
     rating = db.Column(db.Integer, nullable = False)
     content = db.Column(db.Text, nullable = True)
-    answered_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = True)
     parent_question = db.Column(db.Integer, db.ForeignKey('question.id'), nullable = True)
     parent_event = db.Column(db.Integer, db.ForeignKey('event.id'), nullable = True)
 
