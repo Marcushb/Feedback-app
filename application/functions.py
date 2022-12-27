@@ -30,28 +30,6 @@ def change_event(app_id):
                 event.description = event_description
     db.session.commit()
 
-
-# def check_isActive_expired(isActive_status, date_end, time_delta):
-#     endDate = datetime.strptime(date_end, "%Y-%m-%dT%H:%M:%SZ")
-#     cap_time = endDate + timedelta(minutes = time_delta)
-#     if (isActive_status == True and datetime.utcnow() > cap_time):
-#         return False
-#     else:
-#         return True
-
-# def check_isActive_expired(event, time_delta):
-#     if not event.isActive:
-#         return False  
-#     endDate = datetime.strptime(event.date_end, "%Y-%m-%dT%H:%M:%SZ")
-#     cap_time = endDate + timedelta(minutes = time_delta)
-#     if (datetime.utcnow() > cap_time):
-#         event.isActive = False
-#         pin_delete = Pin.query.filter_by(pin = event.pin).delete()
-#         db.session.commit()
-#         return False
-#     else:
-#         return True    
-
 def setIsActive(event, time_delta):
     startDate = datetime.strptime(event.date_start, "%Y-%m-%dT%H:%M:%SZ")
     endDate = datetime.strptime(event.date_end, "%Y-%m-%dT%H:%M:%SZ")
@@ -75,7 +53,7 @@ def setIsActive(event, time_delta):
 
     return event.isActive
 
-def none_json(param_name):
+def none_json(param_name: str) -> flask.Response:
     return jsonify({
         "errorMessage": errorMessages.default_error.value,
         "devInfo": f"Parameter '{param_name}' is None",
@@ -112,3 +90,16 @@ def json_response(
         "route": route,
         "statusCode": statusCode
     })
+
+def create_feedback_summary(feedback_data: list) -> dict:
+    feedback_rating = [feedback.rating for feedback in feedback_data]
+    if len(feedback_rating) == 0:
+        return None
+    else:
+        feedback_object = {}
+        feedback_object['rating1'] = feedback_rating.count(1)
+        feedback_object['rating2'] = feedback_rating.count(2)
+        feedback_object['rating3'] = feedback_rating.count(3)
+        feedback_object['rating4'] = feedback_rating.count(4)
+        feedback_object['feedbackCount'] = len(feedback_rating)
+    return feedback_object

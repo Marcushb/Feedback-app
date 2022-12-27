@@ -3,7 +3,7 @@ from application.models import User, Event, Question, Feedback, Pin, VerifyInput
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
 import flask
-from application.functions import change_event, setIsActive, force_isActive, db_query_filter, json_response
+from application.functions import change_event, setIsActive, force_isActive, db_query_filter, json_response, create_feedback_summary
 import requests
 import uuid
 import jwt
@@ -140,11 +140,6 @@ def login_microsoft():
             user.name = user_name
             db.session.commit()
 
-        # For at definere expiration time
-        # 'exp': datetime.datetime.utcnow(
-        # ) + datetime.timedelta(minutes=30)}
-
-        # Create function to convert one type of variable to another
         if user.name == "":
             user.name = None
         return jsonify({
@@ -152,14 +147,6 @@ def login_microsoft():
                 'email': user.email,
                 'name': user.name
         }), 200
-
-    # if request.method == 'POST':
-    #     user = User.query.filter_by(email=request.form['email']).first()
-    #     if user and bcrypt.check_password_hash(user.password, request.form['password']):
-    #         login_user(user, remember=True)
-    #         return f'Login succesful\nUser information: {User.query.get(user.id)}'
-    #     else:
-    #         return 'Get smashed'
 
 @application.route("/register_app", methods = ["POST"])
 def register_app():
@@ -190,7 +177,6 @@ def register_app():
             )
         db.session.add(new_user)
         db.session.commit()
-        # user = User.query.filter_by(email = new_user.email).first()
         user = db_query_filter("User", "email", new_user.email, "first", "user")
         if user.name == "":
             user.name = None
@@ -224,16 +210,12 @@ def login_app():
                 'route': f'{request.url}',
                 'statusCode': 401
                 }), 401
-                
-                
+
+
 @application.route("/get_microsoft_events", methods = ["POST"])
 @token_required
 def get_outlook_events(current_user):
     if request.method == 'POST':
-        # LAV GENEREL FUNKTION TIL AT VERIFICERE
-        # data = VerifyInput.check_keys(check_type = 'request', keys_expected = ['accessToken'])
-        # if data['result'] == 'error':
-        #     return jsonify(data)
         data = request.get_json(force = True)
         header = {"Authorization": f"Bearer {data['accessToken']}"}
         params = {
@@ -254,22 +236,6 @@ def get_outlook_events(current_user):
             })
         else:
             verified = verified.json()
-            """data = VerifyInput.check_keys(
-                check_type = 'object',
-                keys_expected = [
-                    'id',
-                    'subject',
-                    'bodyPreview',
-                    'start',
-                    'end',
-                    'location',
-                    'attendees'
-                ],
-                data = verified['value'][0]
-                # Ikke glad for at value[0] er hardcoded - led efter alternativ løsning
-            )
-            if data['result'] == 'error':
-                return jsonify(data)"""
         output = []
         for meeting in verified['value']:
             output_data = {}
@@ -298,36 +264,37 @@ def get_outlook_events(current_user):
 def createEvent(current_user):
     if request.method == 'POST':
         user = User.query.filter_by(email = current_user.email).first()
-        data = request.get_json(force = True)
-
-        public_id = str(uuid.uuid4())
-        pin_event = random.randint(0, 9999)
-        while Event.query.filter_by(pin = pin_event).first() is not None:
+        data_total = request.get_json(force = True)
+        
+        for data in data_total:
+            public_id = str(uuid.uuid4())
             pin_event = random.randint(0, 9999)
-        # db.session.add(Pin(pin = pin_event))
-        # db.session.commit()
+            while Event.query.filter_by(pin = pin_event).first() is not None:
+                pin_event = random.randint(0, 9999)
+            # db.session.add(Pin(pin = pin_event))
+            # db.session.commit()
 
-        event = Event(
-            public_id = public_id,
-            pin = pin_event,
-            title = data['title'],
-            date_start = data['startDate'],
-            date_end = data['endDate'],
-            description = data['description'],
-            created_by_user = user.id
-        )
-        db.session.add(event)
-
-        questions = data['questions']
-        event = Event.query.filter_by(public_id = public_id).first()
-
-        for question in questions:
-            question_db = Question(
-                description = question,
-                asked_by_user = user.id,
-                parent_event = event.id
+            event = Event(
+                public_id = public_id,
+                pin = pin_event,
+                title = data['title'],
+                date_start = data['startDate'],
+                date_end = data['endDate'],
+                description = data['description'],
+                created_by_user = user.id
             )
-            db.session.add(question_db)
+            db.session.add(event)
+
+            questions = data['questions']
+            event = Event.query.filter_by(public_id = public_id).first()
+
+            for question in questions:
+                question_db = Question(
+                    description = question,
+                    asked_by_user = user.id,
+                    parent_event = event.id
+                )
+                db.session.add(question_db)
 
         db.session.commit()
 
@@ -341,9 +308,8 @@ def modify_event(current_user):
 
     if request.method == 'PUT':
         event = db_query_filter("Event", "id", data['ID'], "first", "event")
-        # event = Event.query.filter_by(id = data['ID']).first()
-        # if not event:
-        #     return none_json("event")
+        if isinstance(event, tuple):
+            return event
         event.title = data['title']
         event.date_start = data['startDate']
         event.date_end = data['endDate']
@@ -357,9 +323,6 @@ def modify_event(current_user):
             event = db_query_filter("Event", "id", id, "first", "event")
             if isinstance(event, tuple):
                 return event
-            # event = Event.query.filter_by(id = id).first()
-            # if not event:
-            #     return none_json("event")
             questions = Question.query.filter_by(parent_event = id).delete()
             feedbacks = Feedback.query.filter_by(parent_event = id).delete()
             event = Event.query.filter_by(id = id).delete()
@@ -376,7 +339,6 @@ def modify_question(current_user):
         question = db_query_filter("Question", "id", data['ID'], "first", "question")
         if isinstance(question, tuple):
                 return question
-        # question = Question.query.filter_by(id = data['ID']).first()
         question.description = data['description']
         db.session.commit()
 
@@ -387,57 +349,38 @@ def modify_question(current_user):
             question = db_query_filter("Question", "id", id, "first", "question")
             if isinstance(question, tuple):
                 return question
-            # question = Question.query.filter_by(id = id).first()
             feedbacks = Feedback.query.filter_by(parent_question = id).delete()
             question = Question.query.filter_by(id = id).delete()
         db.session.commit()
 
         return {}, 200
 
-@application.route("/modify_feedback", methods = ['PUT', 'DELETE'])
-@token_required
-def modify_feedback(current_user):
-    data = request.get_json(force = True)
-
-    if request.method == 'PUT':
-        feedback = Feedback.query.filter_by(id = data['ID']).first()
-        feedback.rating = data['rating']
-        feedback.content = data['content']
-        db.session.commit()
-
-    if request.method == 'DELETE':
-        for id in data['ID']:
-            feedback = Feedback.query.filter_by(id = id).delete()
-        db.session.commit()
-
-        return {}, 200
-    
-    if request.method == 'DELETE':
-        for id in data['ID']:
-            question = Question.query.filter_by(id = id).first()
-            feedbacks = Feedback.query.filter_by(parent_question = id).delete()
-            question = Question.query.filter_by(id = id).delete()
-        db.session.commit()
-
-        return {}, 200
-
-# @application.route("/question/<app_id>", methods=['POST', 'GET'])
+# @application.route("/modify_feedback", methods = ['PUT', 'DELETE'])
 # @token_required
-# def ask_question(current_user, app_id):
-#     if request.method == 'POST':
-        
-#         user = User.query.filter_by(public_id = current_user.public_id).first()
-#         event = Event.query.filter_by(app_id = app_id).first()
+# def modify_feedback(current_user):
+#     data = request.get_json(force = True)
 
-#         question = Question(
-#             question = request.get_json('question'),
-#             asked_by_user = user.id,
-#             parent_event = event.id
-#         )
-#         db.session.add(question)
+#     if request.method == 'PUT':
+#         feedback = Feedback.query.filter_by(id = data['ID']).first()
+#         feedback.rating = data['rating']
+#         feedback.content = data['content']
 #         db.session.commit()
 
-#         return question.question, 200
+#     if request.method == 'DELETE':
+#         for id in data['ID']:
+#             feedback = Feedback.query.filter_by(id = id).delete()
+#         db.session.commit()
+
+#         return {}, 200
+    
+#     if request.method == 'DELETE':
+#         for id in data['ID']:
+#             question = Question.query.filter_by(id = id).first()
+#             feedbacks = Feedback.query.filter_by(parent_question = id).delete()
+#             question = Question.query.filter_by(id = id).delete()
+#         db.session.commit()
+
+#         return {}, 200
 
 @application.route("/get_all_users", methods=['GET'])
 def get_all_users():
@@ -478,27 +421,14 @@ def get_events_new(current_user):
         events = []
         for event in events_db:
             event_data = {}
-            feedback_data = Feedback.query.filter_by(parent_event = event.id).all()
-            feedback_rating = []
-            for feedback in feedback_data:
-                feedback_rating.append(feedback.rating)
             event_data['id'] = event.id
             event_data['title'] = event.title
             event_data['startDate'] = event.date_start
             event_data['endDate'] = event.date_end
             event_data['isActive'] = setIsActive(event, constant.expiration_min)
-            
-            if len(feedback_rating) == 0:
-                event_data['feedbackSummary'] = None
-            else:
-                event_feedback = {}
-                event_feedback['rating1'] = feedback_rating.count(1)
-                event_feedback['rating2'] = feedback_rating.count(2)
-                event_feedback['rating3'] = feedback_rating.count(3)
-                event_feedback['rating4'] = feedback_rating.count(4)
-                event_feedback['feedbackCount'] = len(feedback_rating)
-                event_data['feedbackSummary'] = event_feedback
-
+            event_data['feedbackSummary'] = create_feedback_summary(
+                Feedback.query.filter_by(parent_event = event.id).all()
+            )
             events.append(event_data)
 
         return jsonify({"response": events}), 200
@@ -533,13 +463,11 @@ def get_events(current_user, id):
         )
         # questions_db = Question.query.filter_by(parent_event = event.id).all()
         questions = []
-        feedback_event_ratings = []
         for question in questions_db:
             question_data = {}
             question_data['id'] = question.id
             question_data['question'] = question.description
 
-            feedback_question_ratings = []
             feedbacks_db = Feedback.query.filter_by(parent_question = question.id).all()
             if not feedbacks_db:
                 feedbacks = None
@@ -548,8 +476,6 @@ def get_events(current_user, id):
                 for feedback in feedbacks_db:
                     feedback_data = {}
                     feedback_data['rating'] = feedback.rating
-                    feedback_event_ratings.append(feedback.rating)
-                    feedback_question_ratings.append(feedback.rating)
                     if not feedback.content:
                         feedback_data['content'] = None
                     else:
@@ -558,32 +484,18 @@ def get_events(current_user, id):
 
             question_data['feedbacks'] = feedbacks
 
-            if len(feedback_question_ratings) == 0:
-                question_data['questionFeedbackSummary'] = None
-            else:
-                question_feedback_summary = {}
-                question_feedback_summary['rating1'] = feedback_question_ratings.count(1)
-                question_feedback_summary['rating2'] = feedback_question_ratings.count(2)
-                question_feedback_summary['rating3'] = feedback_question_ratings.count(3)
-                question_feedback_summary['rating4'] = feedback_question_ratings.count(4)
-                question_feedback_summary['feedbackCount'] = len(feedback_question_ratings)
-                question_data['questionFeedbackSummary'] = question_feedback_summary
+            question_data['questionFeedbackSummary'] = create_feedback_summary(
+                Feedback.query.filter_by(parent_question = question.id).all()
+                )
 
             questions.append(question_data)
             
         event_data['questions'] = questions
 
-        # LAV TIL FUNKTION
-        if len(feedback_event_ratings) == 0:
-                event_data['feedbackSummary'] = None
-        else:
-            event_feedback = {}
-            event_feedback['rating1'] = feedback_event_ratings.count(1)
-            event_feedback['rating2'] = feedback_event_ratings.count(2)
-            event_feedback['rating3'] = feedback_event_ratings.count(3)
-            event_feedback['rating4'] = feedback_event_ratings.count(4)
-            event_feedback['feedbackCount'] = len(feedback_event_ratings)
-            event_data['feedbackSummary'] = event_feedback
+        event_data['feedbackSummary'] = create_feedback_summary(
+            Feedback.query.filter_by(parent_event = event.id).all()
+            )
+
         return jsonify({'response': event_data}), 200
 
 
