@@ -1,5 +1,6 @@
 import json
 from application.models import User, Event, Question, Feedback, Pin, VerifyInput
+from application.constant import status, statusCodes
 from application import application, db, constant, bcrypt
 from flask import request, jsonify, make_response, json
 import flask
@@ -11,6 +12,7 @@ from functools import wraps
 import random
 from datetime import datetime, timedelta
 from dateutil import parser
+import numpy as np
 import pytest
 # random.seed(42)
 db.create_all()
@@ -24,22 +26,25 @@ def token_required(f):
             jwt_token = request.headers['x-access-token']
 
         if not jwt_token:
-            return jsonify({
-                'errorMessage': 'Token is missing',
-                'route': f'{request.url}',
-                'statusCode': 401
-                }), 401
-
+            return json_response(
+                'Login failed.',
+                'Token is missing',
+                request.url,
+                401
+            ), 401
+            
         try:
             data = jwt.decode(jwt_token,
                               application.config['SECRET_KEY'],
                               algorithms="HS256")
             current_user = User.query.filter_by(email = data['email']).first()
         except:
-            return jsonify({
-                'errorMessage': 'Token does not match',
-                'route': f'{request.url}',
-                'statusCode': 401})
+            return json_response(
+                'Login failed.',
+                'Token does not match',
+                request.url,
+                401
+            ), 401
 
         return f(current_user, *args, **kwargs)
 
@@ -110,14 +115,12 @@ def login_microsoft():
                 'route': f'{request.url}',
                 'statusCode': verified.status_code
             }), verified.status_code
-                # undersøg mulighed for at implementre forskellige messages alt efter error, 
-                # f.eks specifik message hvis token er udløbet, en anden hvis den aldrig 
-                # har virket etc
         else:
             verified = verified.json()
    
         user_email, user_name = verified['userPrincipalName'], verified['displayName']
-        user = User.query.filter_by(email = user_email).first()
+        # user = User.query.filter_by(email = user_email).first()
+        user = db_query_filter("User", "email", user_email, "first", "user")
         if not user:
             jwt_token = jwt.encode(
                 {
@@ -153,7 +156,7 @@ def register_app():
     ## IMPLEMENTÉR KRAV TIL EMAIL - HER ELLER FRONTEND?
     if request.method == 'POST':
         data = request.get_json(force = True)
-        exists = User.query.filter_by(email = data['email']).first()
+        exists = db_query_filter("User", "email", data['email'], "first", "exists")
         if exists:
             return jsonify({
                 'errorMessage': 'Email already exists.',
@@ -197,7 +200,7 @@ def register_app():
 def login_app():
      if request.method == 'POST':
         data = request.get_json(force = True)
-        user = User.query.filter_by(email = data['email']).first()
+        user = db_query_filter("User", "email", data['email'], "first", "exists")
         if user and bcrypt.check_password_hash(user.password, data['password']):
             return jsonify({
                 'jwtToken': user.jwt_token,
@@ -228,12 +231,21 @@ def get_outlook_events(current_user):
             )
 
         if 'error' in verified.json().keys():
-            return jsonify({
-                'errorMessage': 'Could not load Microsoft events.',
-                'devInfo': f"{verified.json()['error']['code']}",
-                "route": f"{request.url}",
-                'statusCode': f"{verified.status_code}"
-            })
+            if verified.status_code == 401:
+                return jsonify({
+                    'errorMessage': 'Could not load Microsoft events.',
+                    'devInfo': f"{verified.json()['error']['code']}",
+                    "route": f"{request.url}",
+                    'statusCode': 403
+                }), 403
+            else:
+                json_response(
+                    'Something went wrong.',
+                    'Microsoft event call did not succeed',
+                    request.url,
+                    verified.status_code
+                ), 503
+
         else:
             verified = verified.json()
         output = []
@@ -287,12 +299,13 @@ def createEvent(current_user):
 
             questions = data['questions']
             event = Event.query.filter_by(public_id = public_id).first()
-
-            for question in questions:
+            index_list = list(range(0, len(questions)))
+            for index, question in zip(index_list, questions):
                 question_db = Question(
                     description = question,
                     asked_by_user = user.id,
-                    parent_event = event.id
+                    parent_event = event.id,
+                    index = index
                 )
                 db.session.add(question_db)
 
@@ -301,25 +314,60 @@ def createEvent(current_user):
         return {}, 200
 
 
-@application.route("/modify_event", methods = ['PUT', 'DELETE'])
+@application.route("/modify_event/<id>", methods = ['PUT', 'DELETE'])
 @token_required
-def modify_event(current_user):
+def modify_event(current_user, id):
     data = request.get_json(force = True)
 
     if request.method == 'PUT':
-        event = db_query_filter("Event", "id", data['ID'], "first", "event")
+        event = db_query_filter("Event", "id", id, "first", "event")
         if isinstance(event, tuple):
             return event
+        elif setIsActive(event, constant.expiration_min) == 'FINISHED':
+            return json_response(
+                'Unable to edit finished event.',
+                'Current time is greater than endDate + expiration_min (event finished)',
+                request.url,
+                404
+            ), 404
+            #     statusCodes.not_found.value
+            # ), statusCodes.not_found.value
         event.title = data['title']
         event.date_start = data['startDate']
         event.date_end = data['endDate']
         event.description = data['description']
+
+        index_list = list(range(0, len(data['questions'])))
+        question_new_ids = [question.id for question in data['questions']]
+        question_current_ids = Question.query.filter_by(parent_event = event.id)
+        question_ids_delete = list(np.setdiff1d(question_new_ids, question_current_ids))
+        for question_modified, index in zip(data['questions'], index_list):
+            if not question_modified['id']:
+                question_db = Question(
+                    description = question['description'],
+                    asked_by_user = event.created_by_user,
+                    parent_event = event.id,
+                    index = index
+                )
+                db.session.add(question_db)
+
+            question = db_query_filter(
+                "Question", 
+                "id", 
+                question_modified['id'], 
+                "first", 
+                "question"
+                )
+            question.description = question_modified['description']
+            question.index = index
+            db.session.commit()
+
         db.session.commit()
 
         return {}, 200
-    
+        
     if request.method == 'DELETE':
-        for id in data['ID']:
+        for id in data['id']:
             event = db_query_filter("Event", "id", id, "first", "event")
             if isinstance(event, tuple):
                 return event
@@ -422,6 +470,7 @@ def get_events_new(current_user):
         for event in events_db:
             event_data = {}
             event_data['id'] = event.id
+            event_data['pin'] = event.pin
             event_data['title'] = event.title
             event_data['startDate'] = event.date_start
             event_data['endDate'] = event.date_end
@@ -462,8 +511,10 @@ def get_events(current_user, id):
             "questions_db"
         )
         # questions_db = Question.query.filter_by(parent_event = event.id).all()
+        questions_index = [question.id for question in questions_db]
         questions = []
-        for question in questions_db:
+        for index in np.argsort(questions_index):
+            question = questions_db[index]
             question_data = {}
             question_data['id'] = question.id
             question_data['question'] = question.description
@@ -487,7 +538,7 @@ def get_events(current_user, id):
             question_data['questionFeedbackSummary'] = create_feedback_summary(
                 Feedback.query.filter_by(parent_question = question.id).all()
                 )
-
+            
             questions.append(question_data)
             
         event_data['questions'] = questions
@@ -520,8 +571,10 @@ def initialize_session(pin):
             event_data['description'] = event.description
 
             questions_db = Question.query.filter_by(parent_event = event.id).all()
+            questions_index = [question.id for question in questions_db]        
             questions = []
-            for question in questions_db:
+            for index in np.argsort(questions_index):
+                question = questions_db[index]
                 question_data = {}
                 question_data['description'] = question.description
                 question_data['id'] = question.id

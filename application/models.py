@@ -77,6 +77,7 @@ class Question(db.Model):
     question_answers = db.relationship('Feedback', foreign_keys = 'Feedback.parent_question', backref = 'question_answers', lazy = True)
     asked_by_user = db.Column(db.Integer, db.ForeignKey('user.id'), nullable = True)
     parent_event = db.Column(db.Integer, db.ForeignKey('event.id'), nullable = True)
+    index = db.Column(db.Integer, nullable = False)
 
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)

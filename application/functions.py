@@ -68,10 +68,15 @@ def db_query_filter(
     type: str,
     param_name: str
     ):
-    data = eval(f"{table}.query.filter_by({table_key} = {input_key}).{type}()")
-    if data is None:
+    if isinstance(input_key, str):
+        input_key = '"' + input_key + '"'
+        data = eval(f'{table}.query.filter_by({table_key} = {input_key}).{type}()')
+        return data
+    elif isinstance(input_key, int):
+        data = eval(f"{table}.query.filter_by({table_key} = {input_key}).{type}()")
+        return data
+    else:
         return none_json(param_name)
-    return data
 
 def force_isActive(event):
     event.isActive = status.active.value
